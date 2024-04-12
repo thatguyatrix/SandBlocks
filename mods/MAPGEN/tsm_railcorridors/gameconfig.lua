@@ -3,16 +3,37 @@
 
 -- Adapted for MineClone 2!
 
+-- Imports
+local create_minecart = mcl_minecarts.create_minecart
+local get_cart_data = mcl_minecarts.get_cart_data
+local save_cart_data = mcl_minecarts.save_cart_data
+
 -- Node names (Don't use aliases!)
 tsm_railcorridors.nodes = {
 	dirt = "mcl_core:dirt",
 	chest = "mcl_chests:chest",
-	rail = "mcl_minecarts:rail",
+	rail = "mcl_minecarts:rail_v2",
 	torch_floor = "mcl_torches:torch",
 	torch_wall = "mcl_torches:torch_wall",
 	cobweb = "mcl_core:cobweb",
 	spawner = "mcl_mobspawners:spawner",
 }
+
+local update_rail_connections = mcl_minecarts.update_rail_connections
+local rails_to_update = {}
+tsm_railcorridors.on_place_node = {
+	[tsm_railcorridors.nodes.rail] = function(pos, node)
+		rails_to_update[#rails_to_update + 1] = pos
+	end,
+}
+tsm_railcorridors.on_start = function()
+	rails_to_update = {}
+end
+tsm_railcorridors.on_finish = function()
+	for _,pos in pairs(rails_to_update) do
+		update_rail_connections(pos, {legacy = true, ignore_neighbor_connections = true})
+	end
+end
 
 local mg_name = minetest.get_mapgen_setting("mg_name")
 
@@ -37,19 +58,31 @@ else
 end
 
 
--- TODO: Use minecart with chest instead of normal minecart
-tsm_railcorridors.carts = { "mcl_minecarts:minecart" }
+tsm_railcorridors.carts = { "mcl_minecarts:chest_minecart", "mcl_minecarts:hopper_minecart", "mcl_minecarts:minecart" }
+local has_loot = {
+	["mcl_minecarts:chest_minecart"] = true,
+	["mcl_minecarts:hopper_minceart"] = true,
+}
 
-function tsm_railcorridors.on_construct_cart(pos, cart)
-	-- TODO: Fill cart with treasures
+function tsm_railcorridors.create_cart_staticdata(entity_id,pos, pr)
+	local uuid = create_minecart(entity_id, pos, vector.new(1,0,0))
 
-	-- This is it? There's this giant hack announced in
-	-- the other file and I grep for the function and it's
-	-- a stub? :)
+	-- Fill the cart with loot
+	local cartdata = get_cart_data(uuid)
+	if cartdata and has_loot[entity_id] then
+		local items = tsm_railcorridors.get_treasures(pr)
 
-	-- The path here using some minetest.after hackery was
-	-- deactivated in init.lua - reactivate when this does
-	-- something the function is called RecheckCartHack.
+		-- Convert from ItemStack to itemstrings
+		for k,item in pairs(items) do
+			items[k] = item:to_string()
+		end
+		cartdata.inventory = items
+
+		print("cartdata = "..dump(cartdata))
+		save_cart_data(uuid)
+	end
+
+	return minetest.serialize({ uuid=uuid, seq=1 })
 end
 
 -- Fallback function. Returns a random treasure. This function is called for chests
@@ -102,11 +135,11 @@ function tsm_railcorridors.get_treasures(pr)
 		stacks_min = 3,
 		stacks_max = 3,
 		items = {
-			{ itemstring = "mcl_minecarts:rail", weight = 20, amount_min = 4, amount_max = 8 },
+			{ itemstring = "mcl_minecarts:rail_v2", weight = 20, amount_min = 4, amount_max = 8 },
 			{ itemstring = "mcl_torches:torch", weight = 15, amount_min = 1, amount_max = 16 },
-			{ itemstring = "mcl_minecarts:activator_rail", weight = 5, amount_min = 1, amount_max = 4 },
-			{ itemstring = "mcl_minecarts:detector_rail", weight = 5, amount_min = 1, amount_max = 4 },
-			{ itemstring = "mcl_minecarts:golden_rail", weight = 5, amount_min = 1, amount_max = 4 },
+			{ itemstring = "mcl_minecarts:activator_rail_v2", weight = 5, amount_min = 1, amount_max = 4 },
+			{ itemstring = "mcl_minecarts:detector_rail_v2", weight = 5, amount_min = 1, amount_max = 4 },
+			{ itemstring = "mcl_minecarts:golden_rail_v2", weight = 5, amount_min = 1, amount_max = 4 },
 		}
 	},
 	-- non-MC loot: 50% chance to add a minecart, offered as alternative to spawning minecarts on rails.
