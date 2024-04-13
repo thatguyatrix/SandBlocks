@@ -1,4 +1,4 @@
-local mod = mcl_scheduler
+local mod = vl_scheduler
 
 function Class()
 	local cls = {}
