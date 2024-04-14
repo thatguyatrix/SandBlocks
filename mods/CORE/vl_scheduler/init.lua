@@ -48,7 +48,16 @@ function mod.add_task(time, name, priority, args)
 	queue_add_task(priority_queue, task)
 end
 
-function mod.register_function(name, func)
+function mod.register_function(name, func, default_time, default_priority)
+	-- Validate module in name
+	local modname = minetest.get_current_modname()
+	if string.sub(name,1,#modname+1) ~= (modname..":") and string.sub(name,1) ~= ":" then
+		error("Module "..modname.." is trying to register function '"..name.."' that doesn't start with either '"..modname..":' or ':'")
+	end
+	if string.sub(name,1) == ":" then
+		name = string.sub(name,2,#name-1)
+	end
+
 	local fid = #functions + 1
 	functions[fid] = {
 		func = func,
@@ -57,16 +66,39 @@ function mod.register_function(name, func)
 	}
 	function_id_from_name[name] = fid
 	print("Registering "..name.." as #"..tostring(fid))
+
+	-- Provide a function to easily schedule tasks
+	local dtime = math.floor((default_time or 0) * 20)+1
+	if not default_priority then default_priority = 3 end
+	return function(...)
+		local task = {
+			time = dtime,
+			dtime = dtime,
+			fid = fid,
+			priority = default_priority,
+			args = ...
+		}
+		queue_add_task(priority_queue, task)
+	end
 end
 
-mod.register_function("vl_scheduler:test",function(task)
-	print("game time="..tostring(minetest.get_gametime()))
+-- Examples of scheduler task:
+if false then
+	-- Register a task that runs ever 0.25 seconds
+	mod.register_function("vl_scheduler:test",function(task)
+		print("game time="..tostring(minetest.get_gametime()))
 
-	-- Reschedule task
-	task.time = 0.25 * 20
-	return task
-end)
-mod.add_task(0, "vl_scheduler:test")
+		-- Reschedule task
+		task.time = 0.25
+		return task
+	end)()
+
+	-- Register a function that runs an action at a fixed time in the future
+	local act = mod.register_function("vl_scheduler:act",function(task,arg1)
+		print(dump(arg1))
+	end, 0.15, 1)
+	act("test")
+end
 
 minetest.register_globalstep(function(dtime)
 	local start_time = minetest_get_us_time()
@@ -104,6 +136,7 @@ minetest.register_globalstep(function(dtime)
 
 					-- If the task was returned, reschedule it
 					if ret == task then
+						task.time = math.floor(task.time * 20) + 1
 						task.next = nil
 						queue_add_task(priority_queue, task)
 					end
