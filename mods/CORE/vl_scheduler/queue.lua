@@ -1,4 +1,5 @@
 local mod = vl_scheduler
+local DEBUG = false
 
 --[[
 
@@ -40,6 +41,7 @@ local inner_queue_init_slot_list
 
 function inner_queue:construct(level)
 	self.level = level
+	self.slots = 4
 	--self.items = {}
 	self.unsorted_count = 0
 
@@ -53,7 +55,7 @@ end
 inner_queue_construct = inner_queue.construct
 
 function inner_queue:get()
-	local slots = 4
+	local slots = self.slots
 	local slot = 5 - slots
 	if not self.items then
 		self.items = inner_queue_init_slot_list(self)
@@ -69,10 +71,12 @@ function inner_queue:get()
 			if next_level_get then
 				self.items = next_level_get.items
 			else
-				self.items = {}
+				self.items = inner_queue_init_slot_list(self)
 			end
-			slots = 4
+		else
+			self.items = inner_queue_init_slot_list(self)
 		end
+		slots = 4
 	end
 	self.slots = slots
 
@@ -86,8 +90,10 @@ function inner_queue:insert_task(task)
 	local level = self.level
 
 	local t = task.time
-	--task.log = tostring(t).."(1)<- "..(task.log or "")
-	--print("<"..tostring(self.level).."> t="..tostring(t)..",task.time="..tostring(task.time)..",time="..tostring(time))
+	if DEBUG then
+		task.log = tostring(t).."(1)<- "..(task.log or "")
+		print("<"..tostring(self.level).."> t="..tostring(t)..",task.time="..tostring(task.time)..",time="..tostring(time))
+	end
 	if not (t >= 1 ) then
 		error("Invalid time: task="..dump(task))
 	end
@@ -113,12 +119,18 @@ function inner_queue:insert_task(task)
 	end
 
 	-- Task belongs in a slot on this level
-	--print("t="..tostring(t)..",slot_size="..tostring(slot_size)..",slots="..tostring(slots))
-	local slot = math.floor((t-1) / slot_size) + 1 -- + ( slots - 4 )
+	if DEBUG then
+		print("t="..tostring(t)..",slot_size="..tostring(slot_size)..",slots="..tostring(slots))
+	end
+	local slot = math.floor((t-1) / slot_size) + 1 + ( 4 - slots )
 	t = (t - 1) % slot_size + 1
-	--print("slot="..tostring(slot)..",t="..tostring(t))
+	if DEBUG then
+		print("slot="..tostring(slot)..",t="..tostring(t)..",slots="..tostring(slots))
+	end
 	task.time = t
-	--task.log = tostring(t).."(2)<- "..(task.log or "")
+	if DEBUG then
+		task.log = tostring(t).."(2)<- "..(task.log or "")
+	end
 
 	-- Lazily initialize items
 	if not self.items then
@@ -127,27 +139,30 @@ function inner_queue:insert_task(task)
 
 	-- Get the sublist the item belongs in
 	local list = self.items[slot]
-
+	if not list then
+		print("self="..dump(self))
+	end
 	if level == 1 then
 		assert(task.time <= 20)
 		task.next = list[t]
 		list[t] = task
-
-		--print("list="..dump(list))
 	else
-		--print("list="..dump(list))
 		inner_queue_insert_task(list, task, 0)
 	end
 end
 inner_queue_insert_task = inner_queue.insert_task
 
 function inner_queue:add_tasks(tasks, time)
-	--print("inner_queue<"..tostring(self.level)..">:add_tasks()")
+	if DEBUG then
+		print("inner_queue<"..tostring(self.level)..">:add_tasks()")
+	end
 	local task = tasks
 	local slots = self.slots
 	local slot_size = self.slot_size
 
-	--print("This queue handles times 1-"..tostring(slot_size*slots))
+	if DEBUG then
+		print("This queue handles times 1-"..tostring(slot_size*slots))
+	end
 	while task do
 		local curr_task = task
 		task = task.next
@@ -157,7 +172,9 @@ function inner_queue:add_tasks(tasks, time)
 		inner_queue_insert_task(self, curr_task)
 	end
 
-	--print("self="..dump(self))
+	if DEBUG then
+		print("self="..dump(self))
+	end
 end
 inner_queue_add_tasks = inner_queue.add_tasks
 
@@ -188,7 +205,9 @@ function queue:add_task(task)
 	local t = task.time
 	task.original_time = t
 	t = t + self.m_tick
-	--print("add_task({ time="..tostring(t).." })")
+	if DEBUG then
+		print("add_task({ time="..tostring(t).." })")
+	end
 
 	-- Handle task in current seccond
 	if t <= 20 then
@@ -196,6 +215,10 @@ function queue:add_task(task)
 		self.items[t] = task
 		return
 	end
+
+	-- Update task time
+	t = t - 20
+	task.time = t
 
 	local count = self.unsorted_count
 	if count > 20 then
@@ -225,15 +248,15 @@ function queue:tick()
 	if self.m_tick == 21 then
 		-- Push items to next level
 		if self.first_unsorted then
-			inner_queue_add_tasks(self.next_level, self.first_unsorted, 20)
+			inner_queue_add_tasks(self.next_level, self.first_unsorted, 0)
 			self.first_unsorted = nil
 			self.unsorted_count = 0
 		end
 
-		self.items = inner_queue_get(self.next_level)
+		self.items = inner_queue_get(self.next_level) or {}
 		self.m_tick = 1
 	end
 
-	return ret or {}
+	return ret
 end
 
