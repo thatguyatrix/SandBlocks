@@ -87,7 +87,8 @@ mesecon.queue:add_function("receptor_on", function (pos, rules)
 end)
 
 function mesecon.receptor_on(pos, rules)
-	mesecon.queue:add_action(pos, "receptor_on", {rules}, nil, rules)
+	print("receptor_on(pos="..vector.to_string(pos)..",rules="..dump(rules))
+	--mesecon.queue:add_action(pos, "receptor_on", {rules}, nil, rules)
 end
 
 mesecon.queue:add_function("receptor_off", function (pos, rules)
@@ -114,7 +115,8 @@ mesecon.queue:add_function("receptor_off", function (pos, rules)
 end)
 
 function mesecon.receptor_off(pos, rules)
-	mesecon.queue:add_action(pos, "receptor_off", {rules}, nil, rules)
+	print("receptor_off(pos="..vector.to_string(pos)..",rules="..dump(rules))
+	--mesecon.queue:add_action(pos, "receptor_off", {rules}, nil, rules)
 end
 
 --Services like turnoff receptor on dignode and so on

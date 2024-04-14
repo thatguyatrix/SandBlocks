@@ -58,9 +58,11 @@ local function get_highest_priority(actions)
 	return highesti
 end
 
+--[[
 local m_time = 0
 local resumetime = mesecon.setting("resumetime", 4)
 minetest.register_globalstep(function (dtime)
+
 	m_time = m_time + dtime
 	-- don't even try if server has not been running for XY seconds; resumetime = time to wait
 	-- after starting the server before processing the ActionQueue, don't set this too low
@@ -87,6 +89,7 @@ minetest.register_globalstep(function (dtime)
 		table.remove(actions_now, hp)
 	end
 end)
+]]
 
 function mesecon.queue:execute(action)
 	if not action.pos then return end

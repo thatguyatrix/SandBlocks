@@ -100,7 +100,7 @@ if false then
 	act("test")
 end
 
-minetest.register_globalstep(function(dtime)
+local function run_scheduler(dtime)
 	local start_time = minetest_get_us_time()
 	local end_time = start_time + 50000
 	time = time + dtime
@@ -129,7 +129,10 @@ minetest.register_globalstep(function(dtime)
 				local func = functions[task.fid]
 				if func then
 					--print("Running task "..dump(task)..",func="..dump(func))
-					local ok,ret = pcall(func.func, task, unpack(task.args or {}))
+					local function caller()
+						return func.func(task, unpack(task.args or {}))
+					end
+					local ok,ret = xpcall(caller, debug.traceback)
 					if not ok then
 						minetest.log("error","Error while running task "..func.name..": "..tostring(ret))
 					end
@@ -149,7 +152,9 @@ minetest.register_globalstep(function(dtime)
 			end
 		end
 	end
-	print("Total scheduler time: "..tostring(minetest_get_us_time() - start_time).." microseconds")
+	--print("Total scheduler time: "..tostring(minetest_get_us_time() - start_time).." microseconds")
 	--print("priority_queue="..dump(priority_queue))
-end)
+end
+
+minetest.register_globalstep(function(dtime) run_scheduler(dtime) end)
 
