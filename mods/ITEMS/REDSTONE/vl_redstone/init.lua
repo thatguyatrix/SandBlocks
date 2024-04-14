@@ -4,7 +4,6 @@ vl_redstone = {}
 local mod = vl_redstone
 
 local REDSTONE_POWER_META = modname .. ".power"
-local REDSTONE_POWER_META_LAST_STATE = modname .. ".last-power"
 local REDSTONE_POWER_META_SOURCE = REDSTONE_POWER_META.."."
 
 local function update_sink(pos)
@@ -33,10 +32,10 @@ local function update_sink(pos)
 		end
 	end
 
-	local last_strength = meta:get_int(REDSTONE_POWER_META_LAST_STATE)
+	local last_strength = meta:get_int(REDSTONE_POWER_META)
 
 	if last_strength ~= strength then
-		print("Updating "..node.name.." at "..vector.to_string(pos).."("..tostring(last_strength).."->"..tostring(strength)..")")
+		--print("Updating "..node.name.." at "..vector.to_string(pos).."("..tostring(last_strength).."->"..tostring(strength)..")")
 		-- Inform the node of changes
 		if strength > 0 then
 			-- Handle activation
@@ -54,7 +53,7 @@ local function update_sink(pos)
 		-- TODO: handle signal level change notification
 
 		-- Update the state as the last thing in case there is a crash in the above code
-		meta:set_int(REDSTONE_POWER_META_LAST_STATE, strength)
+		meta:set_int(REDSTONE_POWER_META, strength)
 	end
 end
 
@@ -90,34 +89,35 @@ local function get_positions_from_node_rules(pos, rules_type, list, powered)
 		rules = POWERED_BLOCK_RULES
 	end
 
-	print("rules="..dump(rules))
+	--print("rules="..dump(rules))
 
 	-- Convert to absolute positions
 	for i=1,#rules do
 		local next_pos = vector.add(pos, rules[i])
 		local next_pos_str = vector.to_string(next_pos)
-		print("\tnext: "..next_pos_str..", prev="..tostring(list[next_pos_str]))
+		--print("\tnext: "..next_pos_str..", prev="..tostring(list[next_pos_str]))
 		list[next_pos_str] = true
 
 		-- Power solid blocks
 		if rules[i].spread then
 			powered[next_pos_str] = true
-			print("powering "..next_pos_str)
+			--print("powering "..next_pos_str)
 		end
 	end
 
 	return list
 end
 
-vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_pos, strength, distance)
-	print("Flowing lv"..tostring(strength).." power from "..vector.to_string(source_pos).." for "..tostring(distance).." blocks")
+vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_pos, source_strength, distance)
+	print("Flowing lv"..tostring(source_strength).." power from "..vector.to_string(source_pos).." for "..tostring(distance).." blocks")
 	local processed = {}
 	local powered = {}
 	local source_pos_str = vector.to_string(source_pos)
+	processed[source_pos_str] = true
 
 	-- Update the source node's redstone power
 	local meta = minetest.get_meta(source_pos)
-	meta:set_int(REDSTONE_POWER_META, strength)
+	meta:set_int(REDSTONE_POWER_META, source_strength)
 
 	-- Get rules
 	local list = {}
@@ -126,11 +126,11 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 
 	for i=1,distance do
 		local next_list = {}
-		local strength = strength - (i - 1)
+		local strength = source_strength - (i - 1)
 		if strength < 0 then strength = 0 end
 
 		for pos_str,dir in pairs(list) do
-			print("Processing "..pos_str)
+			--print("Processing "..pos_str)
 
 			if not processed[pos_str] then
 				processed[pos_str] = true
@@ -140,7 +140,7 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 
 				-- Update node power directly
 				meta:set_int(REDSTONE_POWER_META.."."..source_pos_str, strength)
-				print("pos="..vector.to_string(pos)..", strength="..tostring(strength))
+				--print("pos="..vector.to_string(pos)..", strength="..tostring(strength))
 
 				-- handle spread
 				get_positions_from_node_rules(pos, "conductor", next_list, powered)
@@ -158,10 +158,23 @@ end)
 function vl_redstone.set_power(pos, strength)
 	local meta = minetest.get_meta(pos)
 	local distance = meta:get_int(REDSTONE_POWER_META)
+
+	-- Don't perform an update if the power level is the same as before
+	if distance == strength then return end
+
+	print("previous="..tostring(distance)..", new="..tostring(strength))
+
+	-- Make the update distance the maximum of the new strength and the old strength
 	if distance < strength then
 		distance = strength
 	end
 
-	vl_scheduler.add_task(0, "vl_redstone:flow_power", 2, {pos, strength, distance})
+	-- Schedule an update
+	vl_scheduler.add_task(0, "vl_redstone:flow_power", 2, {pos, strength, distance + 1})
+end
+
+function vl_redstone.get_power_level(pos)
+	local meta = minetest.get_meta(pos)
+	return meta:get_int(REDSTONE_POWER_META)
 end
 

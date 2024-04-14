@@ -1,4 +1,6 @@
 local S = minetest.get_translator(minetest.get_current_modname())
+mcl_comparators = {}
+local mod = mcl_comparators
 
 -- Functions that get the input/output rules of the comparator
 
@@ -9,7 +11,6 @@ local function comparator_get_output_rules(node)
 	end
 	return rules
 end
-
 
 local function comparator_get_input_rules(node)
 	local rules = {
@@ -24,117 +25,73 @@ local function comparator_get_input_rules(node)
 	return rules
 end
 
-
--- Functions that are called after the delay time
-
-local function comparator_turnon(params)
-	local rules = comparator_get_output_rules(params.node)
-	mesecon.receptor_on(params.pos, rules)
-end
-
-
-local function comparator_turnoff(params)
-	local rules = comparator_get_output_rules(params.node)
-	mesecon.receptor_off(params.pos, rules)
-end
-
-
--- Functions that set the correct node type an schedule a turnon/off
-
-local function comparator_activate(pos, node)
-	local def = minetest.registered_nodes[node.name]
-	local onstate = def.comparator_onstate
-	if onstate then
-		minetest.swap_node(pos, { name = onstate, param2 = node.param2 })
-	end
-	minetest.after(0.1, comparator_turnon , {pos = pos, node = node})
-end
-
-
-local function comparator_deactivate(pos, node)
-	local def = minetest.registered_nodes[node.name]
-	local offstate = def.comparator_offstate
-	if offstate then
-		minetest.swap_node(pos, { name = offstate, param2 = node.param2 })
-	end
-	minetest.after(0.1, comparator_turnoff, {pos = pos, node = node})
-end
-
-
--- weather pos has an inventory that contains at least one item
-local function container_inventory_nonempty(pos)
-	local invnode = minetest.get_node(pos)
-	local invnodedef = minetest.registered_nodes[invnode.name]
-	-- Ignore stale nodes
-	if not invnodedef then return false end
-
-	-- Only accept containers. When a container is dug, it's inventory
-	-- seems to stay. and we don't want to accept the inventory of an air
-	-- block
-	if not invnodedef.groups.container then return false end
-
-	local inv = minetest.get_inventory({type="node", pos=pos})
-	if not inv then return false end
-
-	for listname, _ in pairs(inv:get_lists()) do
-		if not inv:is_empty(listname) then return true end
-	end
-
-	return false
-end
-
--- weather pos has an constant signal output for the comparator
-local function static_signal_output(pos)
-	local node = minetest.get_node(pos)
-	local g = minetest.get_item_group(node.name, "comparator_signal")
-	return g > 0
-end
-
--- whether the comparator should be on according to its inputs
-local function comparator_desired_on(pos, node)
-	local my_input_rules = comparator_get_input_rules(node);
-	local back_rule = my_input_rules[1]
-	local state
-	if back_rule then
-		local back_pos = vector.add(pos, back_rule)
-		state = mesecon.is_power_on(back_pos) or container_inventory_nonempty(back_pos) or static_signal_output(back_pos)
-	end
-
-	-- if back input if off, we don't need to check side inputs
-	if not state then return false end
-
-	-- without power levels, side inputs have no influence on output in compare
-	-- mode
-	local mode = minetest.registered_nodes[node.name].comparator_mode
-	if mode == "comp" then return state end
-
-	-- subtract mode, subtract max(side_inputs) from back input
-	local side_state = false
-	for ri = 2,3 do
-		if my_input_rules[ri] then
-			side_state = mesecon.is_power_on(vector.add(pos, my_input_rules[ri]))
-		end
-		if side_state then break end
-	end
-	-- state is known to be true
-	return not side_state
-end
-
-
+local POSSIBLE_COMPARATOR_POSITIONS = {
+	vector.new( 1,0, 0),
+	vector.new(-1,0, 0),
+	vector.new( 0,0, 1),
+	vector.new( 0,0,-1),
+}
 -- update comparator state, if needed
 local function update_self(pos, node)
 	node = node or minetest.get_node(pos)
-	local old_state = mesecon.is_receptor_on(node.name)
-	local new_state = comparator_desired_on(pos, node)
-	if new_state ~= old_state then
-		if new_state then
-			comparator_activate(pos, node)
-		else
-			comparator_deactivate(pos, node)
+
+	-- Find the node we are pointing at
+	local input_rules = comparator_get_input_rules(node);
+	local back_rule = input_rules[1]
+	local back_pos = vector.add(pos, back_rule)
+	local back_node = minetest.get_node(back_pos)
+	local back_nodedef = minetest.registered_nodes[back_node.name]
+
+	-- Get the comparator mode
+	local mode = minetest.registered_nodes[node.name].comparator_mode
+
+	-- Get a comparator reading from the block at the back of the comparator
+	local power_level = 0
+	if back_nodedef and back_nodedef._mcl_comparators_get_reading then
+		power_level = back_nodedef._mcl_comparators_get_reading(back_pos)
+	end
+
+	-- Get the maximum side power level
+	local side_power_level = 0
+	for i=2,3 do
+		local pl = vl_redstone.get_power_level(vector.add(pos,input_rules[i]))
+		if pl > side_power_level then
+			side_power_level = pl
+		end
+	end
+
+	-- Apply subtraction or comparison
+	if mode == "sub" then
+		power_level = power_level - side_power_level
+		if power_level < 0 then power_level = 0 end
+	elseif mode == "comp" then
+		if side_power_level > power_level then
+			power_level = 0
+		end
+	end
+
+	vl_redstone.set_power(pos, power_level)
+end
+
+function mod.trigger_update(pos)
+	-- try to find a comparator with the back rule leading to pos
+	for i = 1,#POSSIBLE_COMPARATOR_POSITIONS do
+		local candidate = vector.add(pos, POSSIBLE_COMPARATOR_POSITIONS[i])
+		local node = minetest.get_node(candidate)
+		if minetest.get_item_group(node.name,"mcl_comparator") ~= 0 then
+			update_self(candidate, node)
 		end
 	end
 end
 
+function mod.read_inventory(inv, inv_name)
+	local stacks = inv:get_list(inv_name)
+	local count = 0
+	for i=1,#stacks do
+		count = count + ( stacks[i]:get_count() / stacks[i]:get_stack_max() )
+	end
+	return math.floor(count * 16 / 5)
+end
 
 -- compute tile depending on state and mode
 local function get_tiles(state, mode)
@@ -215,6 +172,7 @@ local groups = {
 	destroy_by_lava_flow = 1,
 	dig_by_piston = 1,
 	attached_node = 1,
+	mcl_comparator = 1,
 }
 
 local on_rotate
@@ -309,7 +267,7 @@ for _, mode in pairs{"comp", "sub"} do
 		end
 
 		minetest.register_node(nodename, nodedef)
-		mcl_wip.register_wip_item(nodename)
+		--mcl_wip.register_wip_item(nodename)
 	end
 end
 
@@ -327,6 +285,7 @@ minetest.register_craft({
 	}
 })
 
+--[[
 -- Register active block handlers
 minetest.register_abm({
 	label = "Comparator signal input check (comparator is off)",
@@ -352,7 +311,7 @@ minetest.register_abm({
 	chance = 1,
 	action = update_self,
 })
-
+]]
 
 -- Add entry aliases for the Help
 if minetest.get_modpath("doc") then

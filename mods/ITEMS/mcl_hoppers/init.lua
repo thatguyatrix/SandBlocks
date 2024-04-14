@@ -283,14 +283,17 @@ local def_hopper = {
 		end
 	end,
 	on_metadata_inventory_move = function(pos, from_list, from_index, to_list, to_index, count, player)
+		mcl_comparators.trigger_update(pos)
 		minetest.log("action", player:get_player_name() ..
 			" moves stuff in mcl_hoppers at " .. minetest.pos_to_string(pos))
 	end,
 	on_metadata_inventory_put = function(pos, listname, index, stack, player)
+		mcl_comparators.trigger_update(pos)
 		minetest.log("action", player:get_player_name() ..
 			" moves stuff to mcl_hoppers at " .. minetest.pos_to_string(pos))
 	end,
 	on_metadata_inventory_take = function(pos, listname, index, stack, player)
+		mcl_comparators.trigger_update(pos)
 		minetest.log("action", player:get_player_name() ..
 			" takes stuff from mcl_hoppers at " .. minetest.pos_to_string(pos))
 	end,
@@ -333,6 +336,11 @@ local def_hopper = {
 		end
 
 		return true
+	end,
+	_mcl_comparators_get_reading = function (pos)
+		local meta = minetest.get_meta(pos)
+		local inv = meta:get_inventory()
+		return mcl_comparators.read_inventory(inv, "main")
 	end,
 	sounds = mcl_sounds.node_sound_metal_defaults(),
 
@@ -525,16 +533,19 @@ local def_hopper_side = {
 		end
 	end,
 	on_metadata_inventory_move = function(pos, from_list, from_index, to_list, to_index, count, player)
+		mcl_comparators.trigger_update(pos)
 		minetest.log("action", player:get_player_name() ..
-			" moves stuff in mcl_hoppers at " .. minetest.pos_to_string(pos))
+			" moves stuff in mcl_hoppers at (1) " .. minetest.pos_to_string(pos))
 	end,
 	on_metadata_inventory_put = function(pos, listname, index, stack, player)
+		mcl_comparators.trigger_update(pos)
 		minetest.log("action", player:get_player_name() ..
-			" moves stuff to mcl_hoppers at " .. minetest.pos_to_string(pos))
+			" moves stuff to mcl_hoppers at (2) " .. minetest.pos_to_string(pos))
 	end,
 	on_metadata_inventory_take = function(pos, listname, index, stack, player)
+		mcl_comparators.trigger_update(pos)
 		minetest.log("action", player:get_player_name() ..
-			" takes stuff from mcl_hoppers at " .. minetest.pos_to_string(pos))
+			" takes stuff from mcl_hoppers at (3) " .. minetest.pos_to_string(pos))
 	end,
 	on_rotate = on_rotate,
 	sounds = mcl_sounds.node_sound_metal_defaults(),
