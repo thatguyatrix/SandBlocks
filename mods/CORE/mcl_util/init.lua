@@ -1225,3 +1225,16 @@ function mcl_util.metadata_last_act(meta, name, delay)
 	return true
 end
 
+-- Call a function safely and provide a backtrace on error
+function mcl_util.call_safe(label, func, args)
+	local function caller()
+		return func(unpack(args))
+	end
+
+	local ok,ret = xpcall(caller, debug.traceback)
+	if not ok then
+		minetest.log("error",(label or "")..ret)
+	end
+
+	return ok,ret
+end

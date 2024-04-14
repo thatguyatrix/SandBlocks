@@ -52,7 +52,7 @@ minetest.register_node("mesecons_walllever:wall_lever_off", {
 	_doc_items_usagehelp = S("Use the lever to flip it on or off."),
 	on_rightclick = function(pos, node)
 		minetest.swap_node(pos, {name="mesecons_walllever:wall_lever_on", param2=node.param2})
-		vl_redstone.set_power(pos, 15)
+		vl_redstone.set_power(pos, 16)
 		minetest.sound_play("mesecons_button_push", {pos=pos, max_hear_distance=16}, true)
 	end,
 	node_placement_prediction = "",

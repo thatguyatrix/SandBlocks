@@ -4,6 +4,9 @@ local modpath = minetest.get_modpath(modname)
 vl_scheduler = {}
 local mod = vl_scheduler
 
+-- Imports
+local call_safe = mcl_util.call_safe
+
 dofile(modpath.."/queue.lua")
 dofile(modpath.."/fifo.lua")
 dofile(modpath.."/test.lua")
@@ -129,13 +132,10 @@ local function run_scheduler(dtime)
 				local func = functions[task.fid]
 				if func then
 					--print("Running task "..dump(task)..",func="..dump(func))
-					local function caller()
-						return func.func(task, unpack(task.args or {}))
-					end
-					local ok,ret = xpcall(caller, debug.traceback)
-					if not ok then
-						minetest.log("error","Error while running task "..func.name..": "..tostring(ret))
-					end
+					local ok,ret = call_safe(
+						"Error while running task "..func.name..": ",
+						func.func, {task, unpack(task.args or {})}
+					)
 
 					-- If the task was returned, reschedule it
 					if ret == task then

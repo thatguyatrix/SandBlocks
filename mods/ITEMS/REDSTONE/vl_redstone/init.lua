@@ -36,17 +36,18 @@ local function update_sink(pos)
 	local last_strength = meta:get_int(REDSTONE_POWER_META_LAST_STATE)
 
 	if last_strength ~= strength then
+		print("Updating "..node.name.." at "..vector.to_string(pos).."("..tostring(last_strength).."->"..tostring(strength)..")")
 		-- Inform the node of changes
 		if strength > 0 then
 			-- Handle activation
 			if sink.action_on then
-				sink.action_on(pos, node)
+				mcl_util.call_safe(nil, sink.action_on, {pos, node})
 			end
 
 		else
 			-- Handle deactivation
 			if sink.action_off then
-				sink.action_off(pos, node)
+				mcl_util.call_safe(nil, sink.action_off, {pos, node})
 			end
 		end
 
@@ -57,28 +58,52 @@ local function update_sink(pos)
 	end
 end
 
-local function get_positions_from_node_rules(pos, rules_type, list)
+local POWERED_BLOCK_RULES = {
+	vector.new( 1, 0, 0),
+	vector.new(-1, 0, 0),
+	vector.new( 0, 1, 0),
+	vector.new( 0,-1, 0),
+	vector.new( 0, 0, 1),
+	vector.new( 0, 0,-1),
+}
+
+local function get_positions_from_node_rules(pos, rules_type, list, powered)
 	list = list or {}
 
 	local node = minetest.get_node(pos)
 	local nodedef = minetest.registered_nodes[node.name]
-	if not nodedef.mesecons then return list end
+	local rules
+	if nodedef.mesecons then
+		-- Get mesecons rules
+		if not nodedef.mesecons[rules_type] then
+			minetest.log("info","Node "..node.name.." has no mesecons."..rules_type.." rules")
+			return list
+		end
+		rules = nodedef.mesecons[rules_type].rules
+		if type(rules) == "function" then rules = rules(node) end
+	else
+		-- The only blocks that don't support mesecon that propagate power are solid blocks that
+		-- are powered by another device. Mesecons calls this 'spread'
+		if not powered[vector.to_string(pos)] then return list end
+		if minetest.get_item_group(node.name,"solid") == 0 then return list end
 
-	-- Get mesecons rules
-	if not nodedef.mesecons[rules_type] then
-		minetest.log("info","Node "..node.name.." has no mesecons."..rules_type.." rules")
-		return list
+		rules = POWERED_BLOCK_RULES
 	end
-	local rules = nodedef.mesecons[rules_type].rules
-	if type(rules) == "function" then rules = rules(node) end
 
-	--print("rules="..dump(rules))
+	print("rules="..dump(rules))
 
 	-- Convert to absolute positions
 	for i=1,#rules do
 		local next_pos = vector.add(pos, rules[i])
 		local next_pos_str = vector.to_string(next_pos)
+		print("\tnext: "..next_pos_str..", prev="..tostring(list[next_pos_str]))
 		list[next_pos_str] = true
+
+		-- Power solid blocks
+		if rules[i].spread then
+			powered[next_pos_str] = true
+			print("powering "..next_pos_str)
+		end
 	end
 
 	return list
@@ -87,6 +112,7 @@ end
 vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_pos, strength, distance)
 	print("Flowing lv"..tostring(strength).." power from "..vector.to_string(source_pos).." for "..tostring(distance).." blocks")
 	local processed = {}
+	local powered = {}
 	local source_pos_str = vector.to_string(source_pos)
 
 	-- Update the source node's redstone power
@@ -95,8 +121,8 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 
 	-- Get rules
 	local list = {}
-	get_positions_from_node_rules(source_pos, "receptor", list)
-	print("initial list="..dump(list))
+	get_positions_from_node_rules(source_pos, "receptor", list, powered)
+	--print("initial list="..dump(list))
 
 	for i=1,distance do
 		local next_list = {}
@@ -117,10 +143,7 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 				print("pos="..vector.to_string(pos)..", strength="..tostring(strength))
 
 				-- handle spread
-				local spread_to = get_positions_from_node_rules(pos, "conductor")
-				for j=1,#spread_to do
-					next_list[vector.to_string(spread_to[j])] = true
-				end
+				get_positions_from_node_rules(pos, "conductor", next_list, powered)
 
 				-- Update the position
 				update_sink(pos)
