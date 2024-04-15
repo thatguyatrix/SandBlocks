@@ -34,6 +34,7 @@ local POSSIBLE_COMPARATOR_POSITIONS = {
 -- update comparator state, if needed
 local function update_self(pos, node)
 	node = node or minetest.get_node(pos)
+	local nodedef = minetest.registered_nodes[node.name]
 
 	-- Find the node we are pointing at
 	local input_rules = comparator_get_input_rules(node);
@@ -43,7 +44,7 @@ local function update_self(pos, node)
 	local back_nodedef = minetest.registered_nodes[back_node.name]
 
 	-- Get the comparator mode
-	local mode = minetest.registered_nodes[node.name].comparator_mode
+	local mode = nodedef.comparator_mode
 
 	-- Get a comparator reading from the block at the back of the comparator
 	local power_level = 0
@@ -70,7 +71,17 @@ local function update_self(pos, node)
 		end
 	end
 
+	-- Update output power level
 	vl_redstone.set_power(pos, power_level)
+
+	-- Update node
+	if power_level ~= 0 then
+		node.name = nodedef.comparator_onstate
+		minetest.swap_node(pos, node)
+	else
+		node.name = nodedef.comparator_offstate
+		minetest.swap_node(pos, node)
+	end
 end
 
 function mod.trigger_update(pos)

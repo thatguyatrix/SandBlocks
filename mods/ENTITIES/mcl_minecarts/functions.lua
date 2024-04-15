@@ -7,27 +7,7 @@ function get_path(base, first, ...)
 	if not base then return end
 	return get_path(base[first], ...)
 end
-local function force_get_node(pos)
-	local node = minetest.get_node(pos)
-	if node.name ~= "ignore" then return node end
-
-	local vm = minetest.get_voxel_manip()
-	local emin, emax = vm:read_from_map(pos, pos)
-	local area = VoxelArea:new{
-		MinEdge = emin,
-		MaxEdge = emax,
-	}
-	local data = vm:get_data()
-	local param_data = vm:get_light_data()
-	local param2_data = vm:get_param2_data()
-
-	local vi = area:indexp(pos)
-	return {
-		name = minetest.get_name_from_content_id(data[vi]),
-		param = param_data[vi],
-		param2 = param2_data[vi]
-	}
-end
+local force_get_node = mcl_util.force_get_node
 
 function mcl_minecarts:get_sign(z)
 	if z == 0 then
