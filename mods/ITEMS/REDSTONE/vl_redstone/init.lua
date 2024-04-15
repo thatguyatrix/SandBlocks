@@ -45,20 +45,21 @@ local function update_node(pos)
 	local node_multipower = get_node_multipower_data(pos)
 	local strength = 0
 	local sources = node_multipower.sources
+	--print("in update_node(pos="..vector_to_string(pos)..") node_multipower("..tostring(node_multipower)..")="..dump(node_multipower))
 	for pos_hash,source_strength in pairs(sources) do
-		--print("\t"..vector_to_string(minetest_get_position_from_hash(pos_hash)).." -> "..tostring(strength))
+		--print("\t"..vector_to_string(pos)..".source["..vector_to_string(minetest_get_position_from_hash(pos_hash)).."] = "..tostring(strength))
 		if source_strength > strength then strength = source_strength end
 	end
 
 	-- Don't do any processing inf the actual strength at this node has changed
-	local last_strength = node_multipower.strength
+	local last_strength = node_multipower.strength or 0
 	--print("At "..vector_to_string(pos).." strength="..tostring(strength)..",last_strength="..tostring(last_strength))
 	if last_strength == strength then return end
 
 	-- Update the state
 	node_multipower.strength = strength
 
-	-- TODO: determine the input rule that the strength is coming from
+	-- TODO: determine the input rule that the strength is coming from (for mesecons compatibility; there are mods that depend on it)
 	local rule = nil
 
 	local sink = nodedef.mesecons.effector
@@ -192,6 +193,7 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 	-- Update the source node's redstone power
 	local node_multipower = get_node_multipower_data(source_pos)
 	node_multipower.strength = source_strength
+	node_multipower.drive_strength = source_strength
 
 	-- Get rules
 	local list = {}
@@ -213,8 +215,11 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 
 				-- Update node power directly
 				local node_multipower = get_node_multipower_data(pos)
+				--local old_strength = node_multipower.sources[source_pos_hash] or 0
+				--print("Changing "..vector.to_string(pos)..".source["..vector_to_string(source_pos).."] from "..tostring(old_strength).." to "..tostring(strength))
+				--print("\tBefore node_multipower("..tostring(node_multipower)..")="..dump(node_multipower))
 				node_multipower.sources[source_pos_hash] = strength
-				--print("pos="..vector.to_string(pos)..", strength="..tostring(strength))
+				--print("\tAfter  node_multipower("..tostring(node_multipower)..")="..dump(node_multipower))
 
 				-- handle spread
 				get_positions_from_node_rules(pos, "conductor", next_list, powered)
@@ -231,7 +236,7 @@ end)
 
 function vl_redstone.set_power(pos, strength)
 	local node_multipower = get_node_multipower_data(pos)
-	local distance = node_multipower.strength or 0
+	local distance = node_multipower.drive_strength or 0
 
 	-- Don't perform an update if the power level is the same as before
 	if distance == strength then return end
