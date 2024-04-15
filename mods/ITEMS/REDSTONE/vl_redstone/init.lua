@@ -4,10 +4,15 @@ vl_redstone = {}
 local mod = vl_redstone
 
 -- Imports
-local force_get_node = mcl_util.force_get_node
-local call_safe = mcl_util.call_safe
-local get_item_group = minetest.get_item_group
-local get_meta = minetest.get_meta
+local mcl_util_force_get_node = mcl_util.force_get_node
+local mcl_util_call_safe = mcl_util.call_safe
+local minetest_get_item_group = minetest.get_item_group
+local minetest_get_meta = minetest.get_meta
+local minetest_hash_node_pos = minetest.hash_node_position
+local minetest_get_position_from_hash = minetest.get_position_from_hash
+local minetest_serialize = minetest.serialize
+local minetest_deserialize = minetest.deserialize
+local minetest_swap_node = minetest.swap_node
 local vector_add = vector.add
 local vector_to_string = vector.to_string
 local vector_from_string = vector.from_string
@@ -16,33 +21,42 @@ local vector_from_string = vector.from_string
 local REDSTONE_POWER_META = modname .. ".power"
 local REDSTONE_POWER_META_SOURCE = REDSTONE_POWER_META.."."
 
+local multipower_cache = {}
+
+local function get_node_multipower_data(pos)
+	local hash = minetest_hash_node_pos(pos)
+	local node_multipower = multipower_cache[hash]
+	if not node_multipower then
+		local meta = minetest_get_meta(pos)
+		node_multipower = minetest_deserialize(meta:get_string("vl_redstone.multipower")) or {sources={}}
+		multipower_cache[hash] = node_multipower
+	end
+	return node_multipower
+end
+
 local function update_node(pos)
-	local node = force_get_node(pos)
+	local node = mcl_util_force_get_node(pos)
 	local nodedef = minetest.registered_nodes[node.name]
 
 	-- Only do this processing of signal sinks
 	if not nodedef.mesecons then return end
 
 	-- Calculate the maximum power feeding into this node
-	-- TODO: check how much time this is taking
-	local meta = minetest.get_meta(pos)
+	local node_multipower = get_node_multipower_data(pos)
 	local strength = 0
-	local meta_tbl = meta:to_table()
-	for k,v in pairs(meta_tbl.fields) do
-		if string.sub(k,1,#REDSTONE_POWER_META_SOURCE) == REDSTONE_POWER_META_SOURCE then
-			local source_strength = tonumber(v)
-			if source_strength > strength then
-				strength = source_strength
-			end
-		end
+	local sources = node_multipower.sources
+	for pos_hash,source_strength in pairs(sources) do
+		--print("\t"..vector_to_string(minetest_get_position_from_hash(pos_hash)).." -> "..tostring(strength))
+		if source_strength > strength then strength = source_strength end
 	end
 
 	-- Don't do any processing inf the actual strength at this node has changed
-	local last_strength = meta:get_int(REDSTONE_POWER_META)
+	local last_strength = node_multipower.strength
+	--print("At "..vector_to_string(pos).." strength="..tostring(strength)..",last_strength="..tostring(last_strength))
 	if last_strength == strength then return end
 
 	-- Update the state
-	meta:set_int(REDSTONE_POWER_META, strength)
+	node_multipower.strength = strength
 
 	-- TODO: determine the input rule that the strength is coming from
 	local rule = nil
@@ -56,7 +70,7 @@ local function update_node(pos)
 			-- Handle activation
 			local hook = sink.action_on
 			if hook then
-				call_safe(nil, hook, {pos, node, rule, strength})
+				mcl_util_call_safe(nil, hook, {pos, node, rule, strength})
 			end
 			if sink.onstate then
 				new_node_name = sink.onstate
@@ -65,7 +79,7 @@ local function update_node(pos)
 			-- Handle deactivation
 			local hook = sink.action_off
 			if hook then
-				call_safe(nil, hook, {pos, node, rule, strength})
+				mcl_util_call_safe(nil, hook, {pos, node, rule, strength})
 			end
 			if sink.offstate then
 				new_node_name = sink.offstate
@@ -75,7 +89,7 @@ local function update_node(pos)
 		-- TODO: handle signal level change notification
 		local hook = sink.action_change
 		if hook then
-			call_safe(nil, hook, {pos, node, rule, strength})
+			mcl_util_call_safe(nil, hook, {pos, node, rule, strength})
 		end
 		if sink.strength_state then
 			new_node_name = sink.strength_state[strength]
@@ -84,7 +98,7 @@ local function update_node(pos)
 		-- Update the node
 		if new_node_name and new_node_name ~= node.name then
 			node.name = new_node_name
-			minetest.swap_node(pos, node)
+			minetest_swap_node(pos, node)
 		end
 		return
 	end
@@ -110,9 +124,9 @@ local function update_node(pos)
 			     ",conductor.onstate="..tostring(conductor.onstate)..
 			     ",conductor.offstate="..tostring(conductor.offstate)
 			)
-			]]
+			--]]
 			node.name = new_node_name
-			minetest.swap_node(pos, node)
+			minetest_swap_node(pos, node)
 		end
 	end
 end
@@ -129,7 +143,7 @@ local POWERED_BLOCK_RULES = {
 local function get_positions_from_node_rules(pos, rules_type, list, powered)
 	list = list or {}
 
-	local node = force_get_node(pos)
+	local node = mcl_util_force_get_node(pos)
 	local nodedef = minetest.registered_nodes[node.name]
 	local rules
 	if nodedef.mesecons then
@@ -143,8 +157,8 @@ local function get_positions_from_node_rules(pos, rules_type, list, powered)
 	else
 		-- The only blocks that don't support mesecon that propagate power are solid blocks that
 		-- are powered by another device. Mesecons calls this 'spread'
-		if not powered[vector_to_string(pos)] then return list end
-		if get_item_group(node.name,"solid") == 0 then return list end
+		if not powered[minetest_hash_node_pos(pos)] then return list end
+		if minetest_get_item_group(node.name,"solid") == 0 then return list end
 
 		rules = POWERED_BLOCK_RULES
 	end
@@ -154,14 +168,14 @@ local function get_positions_from_node_rules(pos, rules_type, list, powered)
 	-- Convert to absolute positions
 	for i=1,#rules do
 		local next_pos = vector_add(pos, rules[i])
-		local next_pos_str = vector_to_string(next_pos)
+		local next_pos_hash = minetest_hash_node_pos(next_pos)
 		--print("\tnext: "..next_pos_str..", prev="..tostring(list[next_pos_str]))
-		list[next_pos_str] = true
+		list[next_pos_hash] = true
 
 		-- Power solid blocks
 		if rules[i].spread then
-			powered[next_pos_str] = true
-			--print("powering "..next_pos_str)
+			powered[next_pos_hash] = true
+			--print("powering "..vector_to_string(next_pos)
 		end
 	end
 
@@ -172,12 +186,12 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 	print("Flowing lv"..tostring(source_strength).." power from "..vector_to_string(source_pos).." for "..tostring(distance).." blocks")
 	local processed = {}
 	local powered = {}
-	local source_pos_str = vector_to_string(source_pos)
-	processed[source_pos_str] = true
+	local source_pos_hash = minetest_hash_node_pos(source_pos)
+	processed[source_pos_hash] = true
 
 	-- Update the source node's redstone power
-	local meta = get_meta(source_pos)
-	meta:set_int(REDSTONE_POWER_META, source_strength)
+	local node_multipower = get_node_multipower_data(source_pos)
+	node_multipower.strength = source_strength
 
 	-- Get rules
 	local list = {}
@@ -189,17 +203,17 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 		local strength = source_strength - (i - 1)
 		if strength < 0 then strength = 0 end
 
-		for pos_str,dir in pairs(list) do
+		for pos_hash,dir in pairs(list) do
 			--print("Processing "..pos_str)
 
-			if not processed[pos_str] then
-				processed[pos_str] = true
+			if not processed[pos_hash] then
+				processed[pos_hash] = true
 
-				local pos = vector_from_string(pos_str)
-				local meta = get_meta(pos)
+				local pos = minetest_get_position_from_hash(pos_hash)
 
 				-- Update node power directly
-				meta:set_int(REDSTONE_POWER_META.."."..source_pos_str, strength)
+				local node_multipower = get_node_multipower_data(pos)
+				node_multipower.sources[source_pos_hash] = strength
 				--print("pos="..vector.to_string(pos)..", strength="..tostring(strength))
 
 				-- handle spread
@@ -216,13 +230,13 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 end)
 
 function vl_redstone.set_power(pos, strength)
-	local meta = get_meta(pos)
-	local distance = meta:get_int(REDSTONE_POWER_META)
+	local node_multipower = get_node_multipower_data(pos)
+	local distance = node_multipower.strength or 0
 
 	-- Don't perform an update if the power level is the same as before
 	if distance == strength then return end
 
-	print("previous="..tostring(distance)..", new="..tostring(strength))
+	--print("previous="..tostring(distance)..", new="..tostring(strength))
 
 	-- Make the update distance the maximum of the new strength and the old strength
 	if distance < strength then
@@ -234,7 +248,15 @@ function vl_redstone.set_power(pos, strength)
 end
 
 function vl_redstone.get_power_level(pos)
-	local meta = get_meta(pos)
-	return meta:get_int(REDSTONE_POWER_META)
+	local node_multipower = get_node_multipower_data(pos)
+	return node_multipower.strength or 0
 end
 
+-- Persist multipower data
+minetest.register_on_shutdown(function()
+	for pos_hash,node_multipower in pairs(multipower_cache) do
+		local pos = minetest_get_position_from_hash(pos_hash)
+		local meta = minetest_get_meta(pos)
+		meta:set_string("vl_redstone.multipower", minetest_serialize(node_multipower))
+	end
+end)
