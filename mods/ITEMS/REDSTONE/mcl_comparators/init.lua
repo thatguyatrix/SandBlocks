@@ -33,6 +33,7 @@ local POSSIBLE_COMPARATOR_POSITIONS = {
 }
 -- update comparator state, if needed
 local function update_self(pos, node)
+	print("Updating comparator at "..vector.to_string(pos))
 	node = node or minetest.get_node(pos)
 	local nodedef = minetest.registered_nodes[node.name]
 
@@ -50,12 +51,14 @@ local function update_self(pos, node)
 	local power_level = 0
 	if back_nodedef and back_nodedef._mcl_comparators_get_reading then
 		power_level = back_nodedef._mcl_comparators_get_reading(back_pos)
+	else
+		power_level = vl_redstone.get_power(back_pos)
 	end
 
 	-- Get the maximum side power level
 	local side_power_level = 0
 	for i=2,3 do
-		local pl = vl_redstone.get_power_level(vector.add(pos,input_rules[i]))
+		local pl = vl_redstone.get_power(vector.add(pos,input_rules[i]))
 		if pl > side_power_level then
 			side_power_level = pl
 		end

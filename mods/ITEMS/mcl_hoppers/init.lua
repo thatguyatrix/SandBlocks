@@ -188,6 +188,11 @@ local function hopper_pull_from_mc(mc_ent, dest_pos, inv_size)
 end
 mcl_hoppers.pull_from_minecart = hopper_pull_from_mc
 
+local function get_reading(pos)
+	local meta = minetest.get_meta(pos)
+	local inv = meta:get_inventory()
+	return mcl_comparators.read_inventory(inv, "main")
+end
 
 -- Downwards hopper (base definition)
 
@@ -337,11 +342,7 @@ local def_hopper = {
 
 		return true
 	end,
-	_mcl_comparators_get_reading = function (pos)
-		local meta = minetest.get_meta(pos)
-		local inv = meta:get_inventory()
-		return mcl_comparators.read_inventory(inv, "main")
-	end,
+	_mcl_comparators_get_reading = get_reading,
 	sounds = mcl_sounds.node_sound_metal_defaults(),
 
 	_mcl_blast_resistance = 4.8,

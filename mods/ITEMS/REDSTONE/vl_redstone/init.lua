@@ -23,10 +23,10 @@ local REDSTONE_POWER_META_SOURCE = REDSTONE_POWER_META.."."
 
 local multipower_cache = {}
 
-local function get_node_multipower_data(pos)
+local function get_node_multipower_data(pos, no_create)
 	local hash = minetest_hash_node_pos(pos)
 	local node_multipower = multipower_cache[hash]
-	if not node_multipower then
+	if not node_multipower and not no_create then
 		local meta = minetest_get_meta(pos)
 		node_multipower = minetest_deserialize(meta:get_string("vl_redstone.multipower")) or {sources={}}
 		multipower_cache[hash] = node_multipower
@@ -236,7 +236,13 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 end)
 
 function vl_redstone.set_power(pos, strength, delay)
-	local node_multipower = get_node_multipower_data(pos)
+	-- Get existing multipower data, but don't create the data if the strength is zero
+	local no_create
+	if strength == 0 then no_create = true end
+	local node_multipower = get_node_multipower_data(pos, no_create)
+	if not node_multipower then return end
+
+	-- Determine how far we need to trace conductors
 	local distance = node_multipower.drive_strength or 0
 
 	-- Don't perform an update if the power level is the same as before
@@ -253,9 +259,31 @@ function vl_redstone.set_power(pos, strength, delay)
 	vl_scheduler.add_task(delay or 0, "vl_redstone:flow_power", 2, {pos, strength, distance + 1})
 end
 
-function vl_redstone.get_power_level(pos)
+function vl_redstone.get_power(pos)
 	local node_multipower = get_node_multipower_data(pos)
 	return node_multipower.strength or 0
+end
+
+function vl_redstone.on_placenode(pos, node)
+	local nodedef = minetest.registered_nodes[node.name]
+	if not nodedef then return end
+	if not nodedef.mesecons then return end
+	local receptor = nodedef.mesecons.receptor
+	if not receptor then return end
+
+	if receptor.state == mesecon.state.on then
+		vl_redstone.set_power(pos, 15)
+	else
+		vl_redstone.set_power(pos, 0)
+	end
+end
+function vl_redstone.on_dignode(pos, node)
+	print("Dug node at "..vector.to_string(pos))
+
+	-- Node was dug, can't power anything
+	-- This doesn't work because the node is gone and we don't know what we were powering
+	-- TODO: get the rules here and use that for the first step
+	vl_redstone.set_power(pos, 0)
 end
 
 -- Persist multipower data
@@ -266,3 +294,6 @@ minetest.register_on_shutdown(function()
 		meta:set_string("vl_redstone.multipower", minetest_serialize(node_multipower))
 	end
 end)
+minetest.register_on_placenode(vl_redstone.on_placenode)
+minetest.register_on_dignode(vl_redstone.on_dignode)
+

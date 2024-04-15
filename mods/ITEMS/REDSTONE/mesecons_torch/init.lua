@@ -71,7 +71,7 @@ local function torch_action_on(pos, node)
 		else
 			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_off", param2=node.param2})
 		end
-		mesecon.receptor_off(pos, torch_get_output_rules(node))
+		vl_redstone.set_power(pos, 0, 2)
 	elseif node.name == "mesecons_torch:mesecon_torch_on_wall" then
 		overheat = mesecon.do_overheat(pos)
 		if overheat then
@@ -79,7 +79,7 @@ local function torch_action_on(pos, node)
 		else
 			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_off_wall", param2=node.param2})
 		end
-		mesecon.receptor_off(pos, torch_get_output_rules(node))
+		vl_redstone.set_power(pos, 0, 2)
 	end
 	if overheat then
 		torch_overheated(pos)
@@ -94,7 +94,7 @@ local function torch_action_off(pos, node)
 			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_overheated", param2=node.param2})
 		else
 			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_on", param2=node.param2})
-			mesecon.receptor_on(pos, torch_get_output_rules(node))
+			vl_redstone.set_power(pos, 15, 2)
 		end
 	elseif node.name == "mesecons_torch:mesecon_torch_off_wall" or node.name == "mesecons_torch:mesecon_torch_overheated_wall" then
 		overheat = mesecon.do_overheat(pos)
@@ -102,7 +102,7 @@ local function torch_action_off(pos, node)
 			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_overheated_wall", param2=node.param2})
 		else
 			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_on_wall", param2=node.param2})
-			mesecon.receptor_on(pos, torch_get_output_rules(node))
+			vl_redstone.set_power(pos, 15, 2)
 		end
 	end
 	if overheat then
