@@ -126,6 +126,7 @@ local function update_node(pos)
 			     ",conductor.offstate="..tostring(conductor.offstate)
 			)
 			--]]
+			node.param2 = strength
 			node.name = new_node_name
 			minetest_swap_node(pos, node)
 		end
@@ -234,7 +235,7 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 	end
 end)
 
-function vl_redstone.set_power(pos, strength)
+function vl_redstone.set_power(pos, strength, delay)
 	local node_multipower = get_node_multipower_data(pos)
 	local distance = node_multipower.drive_strength or 0
 
@@ -249,7 +250,7 @@ function vl_redstone.set_power(pos, strength)
 	end
 
 	-- Schedule an update
-	vl_scheduler.add_task(0, "vl_redstone:flow_power", 2, {pos, strength, distance + 1})
+	vl_scheduler.add_task(delay or 0, "vl_redstone:flow_power", 2, {pos, strength, distance + 1})
 end
 
 function vl_redstone.get_power_level(pos)

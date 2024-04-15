@@ -108,10 +108,10 @@ local function check_unlock_repeater(pos, node)
 		end
 		if mesecon.is_powered(lpos, delayer_get_input_rules(lnode)[1]) then
 			minetest.set_node(lpos, {name="mesecons_delayer:delayer_on_"..ldelay, param2=lnode.param2})
-			mesecon.queue:add_action(lpos, "receptor_on", {delayer_get_output_rules(lnode)}, ldef.delayer_time, nil)
+			vl_redstone.set_power(lpos, 15, ldef.delayer_time)
 		else
 			minetest.set_node(lpos, {name="mesecons_delayer:delayer_off_"..ldelay, param2=lnode.param2})
-			mesecon.queue:add_action(lpos, "receptor_off", {delayer_get_output_rules(lnode)}, ldef.delayer_time, nil)
+			vl_redstone.set_power(lpos,  0, ldef.delayer_time)
 		end
 		return true
 	end
@@ -123,7 +123,7 @@ local function delayer_activate(pos, node)
 	local def = minetest.registered_nodes[node.name]
 	local time = def.delayer_time
 	minetest.set_node(pos, {name=def.delayer_onstate, param2=node.param2})
-	mesecon.queue:add_action(pos, "receptor_on", {delayer_get_output_rules(node)}, time, nil)
+	vl_redstone.set_power(pos, 15, time)
 	check_lock_repeater(pos, node)
 end
 
@@ -131,7 +131,7 @@ local function delayer_deactivate(pos, node)
 	local def = minetest.registered_nodes[node.name]
 	local time = def.delayer_time
 	minetest.set_node(pos, {name=def.delayer_offstate, param2=node.param2})
-	mesecon.queue:add_action(pos, "receptor_off", {delayer_get_output_rules(node)}, time, nil)
+	vl_redstone.set_power(pos, 0, time)
 	check_unlock_repeater(pos, node)
 end
 
@@ -207,7 +207,7 @@ for i = 1, 4 do
 						if mesecon.is_powered(pos, delayer_get_input_rules(node)[1]) ~= false then
 							local newnode = {name="mesecons_delayer:delayer_on_locked", param2 = node.param2}
 							minetest.set_node(pos, newnode)
-							mesecon.queue:add_action(pos, "receptor_on", {delayer_get_output_rules(newnode)}, DEFAULT_DELAY, nil)
+							vl_redstone.set_power(pos, 15, DEFAULT_DELAY)
 						else
 							minetest.set_node(pos, {name="mesecons_delayer:delayer_off_locked", param2 = node.param2})
 						end
