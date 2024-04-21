@@ -100,6 +100,8 @@ end
 
 function mod.read_inventory(inv, inv_name)
 	local stacks = inv:get_list(inv_name)
+	if not stacks then return 0 end
+
 	local count = 0
 	for i=1,#stacks do
 		count = count + ( stacks[i]:get_count() / stacks[i]:get_stack_max() )
