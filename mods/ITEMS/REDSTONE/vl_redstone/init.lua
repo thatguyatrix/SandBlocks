@@ -33,6 +33,15 @@ local function direction_from_hash(dir_hash)
 	local z = dir_hash % 3 - 1
 	return vector.new(x,y,z)
 end
+local HASH_REVERSES = {}
+for i=0,27 do
+	local dir = direction_from_hash(i)
+	local dir_rev = vector.subtract(vector.zero(), dir)
+	local dir_rev_hash = hash_from_direction(dir_rev)
+	HASH_REVERSES[dir_rev_hash] = i
+	--print("hash["..tostring(i).."] = "..vector_to_string(direction_from_hash(i))..", rev="..tostring(dir_rev_hash))
+end
+
 local DIR_HASH_ZERO = hash_from_direction(vector.zero())
 print("DIR_HASH_ZERO="..tostring(DIR_HASH_ZERO))
 
@@ -77,7 +86,7 @@ local function calculate_driven_strength(pos, input_rules_hash)
 	local sources = node_multipower.sources
 	input_rules_hash = input_rules_hash or {}
 
-	print("in update_node(pos="..vector_to_string(pos)..") node_multipower("..tostring(node_multipower)..")="..dump(node_multipower))
+	--print("in update_node(pos="..vector_to_string(pos)..") node_multipower("..tostring(node_multipower)..")="..dump(node_multipower))
 	for pos_hash,data in pairs(sources) do
 		local source_strength = data[1]
 		local dirs = data[2]
@@ -94,7 +103,7 @@ local function calculate_driven_strength(pos, input_rules_hash)
 			end
 		end
 
-		print("match="..tostring(match)..",source_strength="..tostring(source_strength))
+		--print("match="..tostring(match)..",source_strength="..tostring(source_strength))
 
 		-- Update strength and track which direction the strongest power is coming from
 		if match and source_strength >= strength then
@@ -105,7 +114,7 @@ local function calculate_driven_strength(pos, input_rules_hash)
 		end
 	end
 
-	return strength,strongest_direction_hash
+	return strength,HASH_REVERSES[strongest_direction_hash]
 end
 
 local function update_node(pos)
@@ -116,7 +125,7 @@ local function update_node(pos)
 	local nodedef_mesecons = nodedef.mesecons
 	if not nodedef_mesecons then return end
 
-	print("Running update_node(pos="..vector_to_string(pos)..")")
+	--print("Running update_node(pos="..vector_to_string(pos)..", node.name="..node.name..")")
 
 	-- Get input rules
 	local input_rules = nil
@@ -126,24 +135,33 @@ local function update_node(pos)
 		input_rules = nodedef_mesecons.effector.rules
 	else
 		-- No input rules, can't act
-		print("Unable to find input rules for "..node.name..": mesecons="..dump(nodedef_mesecons))
+		--print("Unable to find input rules for "..node.name..": mesecons="..dump(nodedef_mesecons))
 		return
+	end
+	if type(input_rules) == "function" then
+		input_rules = input_rules(node)
 	end
 
 	-- Calculate the maximum power feeding into this node
 	local input_rules_hash = get_input_rules_hash(nodedef_mesecons, input_rules)
-	print("input_rules_hash="..dump(input_rules_hash)..", input_rules="..dump(input_rules))
+	--print("input_rules_hash="..dump(input_rules_hash)..", input_rules="..dump(input_rules))
 	local strength,dir_hash = calculate_driven_strength(pos, input_rules_hash)
-	print("strength="..tostring(strength)..",dir_hash="..tostring(dir_hash))
+	--print("strength="..tostring(strength)..",dir_hash="..tostring(dir_hash))
 
 	-- Don't do any processing inf the actual strength at this node has changed
 	local node_multipower = get_node_multipower_data(pos)
 	local last_strength = node_multipower.strength or 0
-	print("At "..vector_to_string(pos).." strength="..tostring(strength)..",last_strength="..tostring(last_strength))
-	if last_strength == strength then return end
+	--print("At "..vector_to_string(pos).."("..node.name..") strength="..tostring(strength)..",last_strength="..tostring(last_strength))
+	if last_strength == strength then
+		--print("No strength change")
+		return
+	end
 
 	-- Determine the input rule that the strength is coming from (for mesecons compatibility; there are mods that depend on it)
 	local rule = nil
+	--print("input_rules="..dump(input_rules))
+	--print("input_rules_hash="..dump(input_rules_hash))
+	--print("dir_hash="..tostring(dir_hash))
 	for i = 1,#input_rules do
 		local input_rule = input_rules[i]
 		local input_rule_hash = hash_from_direction(input_rule)
@@ -153,10 +171,8 @@ local function update_node(pos)
 		end
 	end
 	if not rule then
-		print("No rule found")
+		--print("No rule found")
 		return
-	else
-		print("rule="..dump(rule))
 	end
 
 	-- Update the state
@@ -218,7 +234,7 @@ local function update_node(pos)
 
 		-- Update the node
 		if new_node_name and new_node_name ~= node.name then
-			---[[
+			--[[
 			print("Changing "..vector_to_string(pos).." from "..node.name.." to "..new_node_name..
 			    ", strength="..tostring(strength)..",last_strength="..tostring(last_strength))
 			print("node.name="..node.name..
@@ -319,17 +335,17 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 
 				-- Update node power directly
 				local node_multipower = get_node_multipower_data(pos)
-				local old_data = node_multipower.sources[source_pos_hash]
-				local old_strength = old_data and old_data[1] or 0
-				print("Changing "..vector.to_string(pos)..".source["..vector_to_string(source_pos).."] from "..tostring(old_strength).." to "..tostring(strength))
-				print("\tBefore node_multipower("..tostring(node_multipower)..")="..dump(node_multipower))
-				print("\tdir_list="..dump(dir_list))
+				--local old_data = node_multipower.sources[source_pos_hash]
+				--local old_strength = old_data and old_data[1] or 0
+				--print("Changing "..vector.to_string(pos)..".source["..vector_to_string(source_pos).."] from "..tostring(old_strength).." to "..tostring(strength))
+				--print("\tBefore node_multipower("..tostring(node_multipower)..")="..dump(node_multipower))
+				--print("\tdir_list="..dump(dir_list))
 				local dirs = {}
 				for k,_ in pairs(dir_list) do
 					dirs[#dirs+1] = k
 				end
 				node_multipower.sources[source_pos_hash] = {strength,dirs}
-				print("\tAfter  node_multipower("..tostring(node_multipower)..")="..dump(node_multipower))
+				--print("\tAfter  node_multipower("..tostring(node_multipower)..")="..dump(node_multipower))
 
 				-- handle spread
 				get_positions_from_node_rules(pos, "conductor", next_list, powered)
