@@ -62,51 +62,47 @@ local function torch_overheated(pos)
 	timer:start(TORCH_COOLOFF)
 end
 
-local function torch_action_on(pos, node)
-	local overheat
-	if node.name == "mesecons_torch:mesecon_torch_on" then
-		overheat = mesecon.do_overheat(pos)
-		if overheat then
-			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_overheated", param2=node.param2})
-		else
-			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_off", param2=node.param2})
-		end
-		vl_redstone.set_power(pos, 0, 2)
-	elseif node.name == "mesecons_torch:mesecon_torch_on_wall" then
-		overheat = mesecon.do_overheat(pos)
-		if overheat then
-			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_overheated_wall", param2=node.param2})
-		else
-			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_off_wall", param2=node.param2})
-		end
-		vl_redstone.set_power(pos, 0, 2)
-	end
-	if overheat then
-		torch_overheated(pos)
-	end
-end
+local TORCH_STATE_ON = {
+	["mesecons_torch:mesecon_torch_off"] = "mesecons_torch:mesecon_torch_on",
+	["mesecons_torch:mesecon_torch_off_wall"] = "mesecons_torch:mesecon_torch_on_wall",
+}
+local TORCH_STATE_OFF = {
+	["mesecons_torch:mesecon_torch_on"] = "mesecons_torch:mesecon_torch_off",
+	["mesecons_torch:mesecon_torch_on_wall"] = "mesecons_torch:mesecon_torch_off_wall",
+}
+local TORCH_STATE_OVERHEAT = {
+	["mesecons_torch:mesecon_torch_on"] = "mesecons_torch:mesecon_torch_overheated",
+	["mesecons_torch:mesecon_torch_on_wall"] = "mesecons_torch:mesecon_torch_overheated_wall",
+	["mesecons_torch:mesecon_torch_off"] = "mesecons_torch:mesecon_torch_overheated",
+	["mesecons_torch:mesecon_torch_off_wall"] = "mesecons_torch:mesecon_torch_overheated_wall",
+}
 
-local function torch_action_off(pos, node)
-	local overheat
-	if node.name == "mesecons_torch:mesecon_torch_off" or node.name == "mesecons_torch:mesecon_torch_overheated" then
+local function torch_action_change(pos, node, rule, strength)
+	local nodedef = minetest.registered_nodes[node.name]
+	--local effector_state = ((nodedef.mesecons or {}).effector or {}).state
+	--local is_on = ( effector_state == mesecon.state.on )
+	local overheat = false
+	local original_name = node.name
+
+	if strength == 0 then
+		-- Turn on
+		node.name = TORCH_STATE_ON[node.name] or node.name
+		vl_redstone.set_power(pos, 15, 0.1)
 		overheat = mesecon.do_overheat(pos)
-		if overheat then
-			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_overheated", param2=node.param2})
-		else
-			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_on", param2=node.param2})
-			vl_redstone.set_power(pos, 15, 2)
-		end
-	elseif node.name == "mesecons_torch:mesecon_torch_off_wall" or node.name == "mesecons_torch:mesecon_torch_overheated_wall" then
-		overheat = mesecon.do_overheat(pos)
-		if overheat then
-			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_overheated_wall", param2=node.param2})
-		else
-			minetest.swap_node(pos, {name="mesecons_torch:mesecon_torch_on_wall", param2=node.param2})
-			vl_redstone.set_power(pos, 15, 2)
-		end
+	else
+		-- Turn off
+		node.name = TORCH_STATE_OFF[node.name] or node.name
+		vl_redstone.set_power(pos, 0, 0.1)
 	end
+
 	if overheat then
+		print("overheat")
 		torch_overheated(pos)
+		node.name = TORCH_STATE_OVERHEAT[node.name] or node.name
+	end
+
+	if node.name ~= original_name then
+		minetest.swap_node(pos, node)
 	end
 end
 
@@ -140,9 +136,9 @@ local off_override = {
 		effector = {
 			state = mesecon.state.on,
 			rules = torch_get_input_rules,
-			action_off = torch_action_off,
+			action_change = torch_action_change,
 		},
-	}
+	},
 }
 
 minetest.override_item("mesecons_torch:mesecon_torch_off", off_override)
@@ -158,7 +154,7 @@ local overheated_override = {
 	on_timer = function(pos, elapsed)
 		if not mesecon.is_powered(pos) then
 			local node = minetest.get_node(pos)
-			torch_action_off(pos, node)
+			torch_action_change(pos, node, nil, 0)
 		end
 	end
 }
@@ -183,7 +179,7 @@ mcl_torches.register_torch(on_def)
 local on_override = {
 	on_destruct = function(pos, oldnode)
 		local node = minetest.get_node(pos)
-		torch_action_on(pos, node)
+		torch_action_change(pos, node, nil, 0)
 	end,
 	mesecons = {
 		receptor = {
@@ -193,7 +189,7 @@ local on_override = {
 		effector = {
 			state = mesecon.state.off,
 			rules = torch_get_input_rules,
-			action_on = torch_action_on,
+			action_change = torch_action_change,
 		},
 	},
 	_tt_help = S("Provides redstone power when it's not powered itself"),

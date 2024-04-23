@@ -151,11 +151,14 @@ local function update_node(pos)
 	-- Don't do any processing inf the actual strength at this node has changed
 	local node_multipower = get_node_multipower_data(pos)
 	local last_strength = node_multipower.strength or 0
-	--print("At "..vector_to_string(pos).."("..node.name..") strength="..tostring(strength)..",last_strength="..tostring(last_strength))
+
+	--[[
+	print("At "..vector_to_string(pos).."("..node.name..") strength="..tostring(strength)..",last_strength="..tostring(last_strength))
 	if last_strength == strength then
-		--print("No strength change")
+		print("No strength change")
 		return
 	end
+	--]]
 
 	-- Determine the input rule that the strength is coming from (for mesecons compatibility; there are mods that depend on it)
 	local rule = nil
@@ -304,7 +307,7 @@ local function get_positions_from_node_rules(pos, rules_type, list, powered)
 end
 
 vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_pos, source_strength, distance)
-	print("Flowing lv"..tostring(source_strength).." power from "..vector_to_string(source_pos).." for "..tostring(distance).." blocks")
+	--print("Flowing lv"..tostring(source_strength).." power from "..vector_to_string(source_pos).." for "..tostring(distance).." blocks")
 	local processed = {}
 	local powered = {}
 	local source_pos_hash = minetest_hash_node_pos(source_pos)
