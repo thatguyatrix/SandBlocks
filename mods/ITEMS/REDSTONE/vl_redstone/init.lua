@@ -67,7 +67,7 @@ local function get_node_multipower_data(pos, no_create)
 	if not node_multipower then
 		local meta = minetest_get_meta(pos)
 		node_multipower = minetest_deserialize(meta:get_string("vl_redstone.multipower"))
-		if not no_create and not node_multipower or node_multipower.version ~= 1 then
+		if not no_create and ( not node_multipower or node_multipower.version ~= 1 ) then
 			node_multipower = {
 				version = 1,
 				sources={}
@@ -369,7 +369,7 @@ function vl_redstone.set_power(pos, strength, delay, node)
 	if strength == 0 then no_create = true end
 	local node_multipower = get_node_multipower_data(pos, no_create)
 	if not node_multipower then
-		print("No node multipower, no_create="..no_create)
+		print("No node multipower, no_create="..tostring(no_create))
 		return
 	end
 
