@@ -64,10 +64,10 @@ end
 local function get_node_multipower_data(pos, no_create)
 	local hash = minetest_hash_node_pos(pos)
 	local node_multipower = multipower_cache[hash]
-	if not node_multipower and not no_create then
+	if not node_multipower then
 		local meta = minetest_get_meta(pos)
 		node_multipower = minetest_deserialize(meta:get_string("vl_redstone.multipower"))
-		if not node_multipower or node_multipower.version ~= 1 then
+		if not no_create and not node_multipower or node_multipower.version ~= 1 then
 			node_multipower = {
 				version = 1,
 				sources={}
@@ -78,7 +78,7 @@ local function get_node_multipower_data(pos, no_create)
 	return node_multipower
 end
 
-local function calculate_driven_strength(pos, input_rules_hash)
+local function calculate_driven_strength(pos, input_rules_hash, dir)
 	local dir_hash = dir and hash_from_direction(dir)
 	local node_multipower = get_node_multipower_data(pos)
 	local strength = 0
@@ -117,8 +117,8 @@ local function calculate_driven_strength(pos, input_rules_hash)
 	return strength,HASH_REVERSES[strongest_direction_hash]
 end
 
-local function update_node(pos)
-	local node = mcl_util_force_get_node(pos)
+local function update_node(pos, node)
+	local node = node or mcl_util_force_get_node(pos)
 	local nodedef = minetest.registered_nodes[node.name]
 
 	-- Only do this processing of signal sinks and conductors
@@ -363,18 +363,24 @@ vl_scheduler.register_function("vl_redstone:flow_power",function(task, source_po
 	end
 end)
 
-function vl_redstone.set_power(pos, strength, delay)
+function vl_redstone.set_power(pos, strength, delay, node)
 	-- Get existing multipower data, but don't create the data if the strength is zero
 	local no_create
 	if strength == 0 then no_create = true end
 	local node_multipower = get_node_multipower_data(pos, no_create)
-	if not node_multipower then return end
+	if not node_multipower then
+		print("No node multipower, no_create="..no_create)
+		return
+	end
 
 	-- Determine how far we need to trace conductors
 	local distance = node_multipower.drive_strength or 0
 
 	-- Don't perform an update if the power level is the same as before
-	if distance == strength then return end
+	if distance == strength then
+		print("Don't perform update distance="..tostring(distance)..",strength="..tostring(strength))
+		return
+	end
 
 	--print("previous="..tostring(distance)..", new="..tostring(strength))
 
@@ -384,7 +390,7 @@ function vl_redstone.set_power(pos, strength, delay)
 	end
 
 	-- Schedule an update
-	vl_scheduler.add_task(delay or 0, "vl_redstone:flow_power", 2, {pos, strength, distance + 1})
+	vl_scheduler.add_task(delay or 0, "vl_redstone:flow_power", 2, {pos, strength, distance + 1, node})
 end
 
 function vl_redstone.get_power(pos)
@@ -411,7 +417,7 @@ function vl_redstone.on_dignode(pos, node)
 	-- Node was dug, can't power anything
 	-- This doesn't work because the node is gone and we don't know what we were powering
 	-- TODO: get the rules here and use that for the first step
-	vl_redstone.set_power(pos, 0)
+	vl_redstone.set_power(pos, 0, nil, node)
 end
 
 -- Persist multipower data

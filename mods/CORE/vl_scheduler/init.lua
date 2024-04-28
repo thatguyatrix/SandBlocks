@@ -104,6 +104,10 @@ if false then
 end
 
 local function run_scheduler(dtime)
+	if dtime > 0.11 then
+		minetest.log("warning", "Timestep greater than 110ms("..tostring(math.floor(dtime*1000)).." ms), server lag detected")
+	end
+
 	local start_time = minetest_get_us_time()
 	local end_time = start_time + 50000
 	time = time + dtime

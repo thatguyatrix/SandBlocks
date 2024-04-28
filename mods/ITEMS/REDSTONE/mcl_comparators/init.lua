@@ -87,7 +87,23 @@ local function update_self(pos, node)
 	end
 end
 
-function mod.trigger_update(pos)
+local node_readings = {}
+function mod.trigger_update(pos, node)
+	local node = node or minetest.get_node(pos)
+	local nodedef = minetest.registered_nodes[node.name] or {}
+
+	-- If this position can't provide a comparator reading, we should
+	-- never trigger a comparator update
+	local get_reading = nodedef._mcl_comparators_get_reading
+	if not get_reading then return end
+
+	-- Only update if the reading has changed
+	local pos_hash = minetest.hash_node_position(pos)
+	local old_reading = node_readings[pos_hash]
+	local new_reading = get_reading(pos)
+	if old_reading == new_reading then return end
+	node_readings[pos_hash] = new_reading
+
 	-- try to find a comparator with the back rule leading to pos
 	for i = 1,#POSSIBLE_COMPARATOR_POSITIONS do
 		local candidate = vector.add(pos, POSSIBLE_COMPARATOR_POSITIONS[i])
@@ -106,7 +122,7 @@ function mod.read_inventory(inv, inv_name)
 	for i=1,#stacks do
 		count = count + ( stacks[i]:get_count() / stacks[i]:get_stack_max() )
 	end
-	return math.floor(count * 16 / 5)
+	return math.floor(count * 16 / #stacks)
 end
 
 -- compute tile depending on state and mode

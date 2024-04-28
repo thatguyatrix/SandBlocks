@@ -88,6 +88,7 @@ end)
 
 function mesecon.receptor_on(pos, rules)
 	print("receptor_on(pos="..vector.to_string(pos)..",rules="..dump(rules))
+	print(debug.traceback())
 	--mesecon.queue:add_action(pos, "receptor_on", {rules}, nil, rules)
 end
 
@@ -116,6 +117,7 @@ end)
 
 function mesecon.receptor_off(pos, rules)
 	print("receptor_off(pos="..vector.to_string(pos)..",rules="..dump(rules))
+	print(debug.traceback())
 	--mesecon.queue:add_action(pos, "receptor_off", {rules}, nil, rules)
 end
 

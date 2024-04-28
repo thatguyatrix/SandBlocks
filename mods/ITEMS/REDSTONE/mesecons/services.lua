@@ -2,6 +2,7 @@
 
 function mesecon.on_placenode(pos, node)
 	mesecon.execute_autoconnect_hooks_now(pos, node)
+	--[[
 
 	-- Receptors: Send on signal when active
 	if mesecon.is_receptor_on(node.name) then
@@ -68,6 +69,7 @@ function mesecon.on_placenode(pos, node)
 			end
 		end
 	end
+	]]
 end
 
 function mesecon.on_dignode(pos, node)
@@ -103,7 +105,7 @@ function mesecon.on_blastnode(pos, node)
 end
 
 minetest.register_on_placenode(mesecon.on_placenode)
-minetest.register_on_dignode(mesecon.on_dignode)
+--minetest.register_on_dignode(mesecon.on_dignode)
 
 -- Overheating service for fast circuits
 local OVERHEAT_MAX = mesecon.setting("overheat_max", 8)

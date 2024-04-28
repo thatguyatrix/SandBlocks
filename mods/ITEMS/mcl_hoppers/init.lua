@@ -34,6 +34,12 @@ local mcl_hoppers_formspec = table.concat({
 	"listring[current_player;main]",
 })
 
+local function get_reading(pos)
+	local meta = minetest.get_meta(pos)
+	local inv = meta:get_inventory()
+	return mcl_comparators.read_inventory(inv, "main")
+end
+
 local function straight_hopper_act(pos, node, active_object_count, active_count_wider)
 	local timer = minetest.get_node_timer(pos)
 	if timer:is_started() then
@@ -52,9 +58,15 @@ local function straight_hopper_act(pos, node, active_object_count, active_count_
 		dst_def._mcl_hopper_act( dst_pos, dst_node, active_object_count, active_count_wider )
 	end
 
-	mcl_util.hopper_push(pos, dst_pos)
+	local pushed = mcl_util.hopper_push(pos, dst_pos)
+
 	local src_pos = vector.offset(pos, 0, 1, 0)
-	mcl_util.hopper_pull(pos, src_pos)
+	local pulled = mcl_util.hopper_pull(pos, src_pos)
+
+	if pushed or pulled then mcl_comparators.trigger_update(pos) end
+
+	-- Update comparators
+	mcl_comparators.trigger_update(pos, node)
 end
 
 local function bent_hopper_act(pos, node, active_object_count, active_object_count_wider)
@@ -94,6 +106,9 @@ local function bent_hopper_act(pos, node, active_object_count, active_object_cou
 
 	local src_pos = vector.offset(pos, 0, 1, 0)
 	mcl_util.hopper_pull(pos, src_pos)
+
+	-- Update comparators
+	mcl_comparators.trigger_update(pos, node)
 end
 
 --[[
@@ -187,12 +202,6 @@ local function hopper_pull_from_mc(mc_ent, dest_pos, inv_size)
 	end
 end
 mcl_hoppers.pull_from_minecart = hopper_pull_from_mc
-
-local function get_reading(pos)
-	local meta = minetest.get_meta(pos)
-	local inv = meta:get_inventory()
-	return mcl_comparators.read_inventory(inv, "main")
-end
 
 -- Downwards hopper (base definition)
 
