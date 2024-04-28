@@ -214,6 +214,11 @@ local function register_wires()
 		local dot_off = "redstone_redstone_dust_dot.png^[colorize:#FF0000:"..ratio_off
 		local dot_on = "redstone_redstone_dust_dot.png^[colorize:#FF0000:"..ratio_on
 
+		local crossing = "(redstone_redstone_dust_dot.png^redstone_redstone_dust_line0.png^(redstone_redstone_dust_line1.png^[transformR90))"
+		local straight0 = "redstone_redstone_dust_line0.png"
+		local straight1 = "redstone_redstone_dust_line0.png"
+		local dot = "redstone_redstone_dust_dot.png"
+
 		local tiles_off, tiles_on
 
 		local wirehelp, tt, longdesc, usagehelp, img, desc_off, desc_on
@@ -221,8 +226,8 @@ local function register_wires()
 			-- Non-connected redstone wire
 			nodebox.fixed = {-8/16, -.5, -8/16, 8/16, -.5+1/64, 8/16}
 			-- “Dot” texture
-			tiles_off = { dot_off, dot_off, "blank.png", "blank.png", "blank.png", "blank.png" }
-			tiles_on = { dot_on, dot_on, "blank.png", "blank.png", "blank.png", "blank.png" }
+			tiles_off = { dot, dot, "blank.png", "blank.png", "blank.png", "blank.png" }
+			tiles_on = { dot, dot, "blank.png", "blank.png", "blank.png", "blank.png" }
 
 			tt = S("Transmits redstone power, powers mechanisms")
 			longdesc = S("Redstone is a versatile conductive mineral which transmits redstone power. It can be placed on the ground as a trail.").."\n"..
@@ -237,8 +242,8 @@ S("Read the help entries on the other redstone components to learn how redstone 
 		else
 			-- Connected redstone wire
 			table.insert(nodebox, box_center)
-			tiles_off = { crossing_off, crossing_off, straight0_off, straight1_off, straight0_off, straight1_off }
-			tiles_on = { crossing_on, crossing_on, straight0_on, straight1_on, straight0_on, straight1_on }
+			tiles_off = { crossing, crossing, straight0, straight1, straight0, straight1 }
+			tiles_on = { crossing, crossing, straight0, straight1, straight0, straight1 }
 			wirehelp = false
 			desc_off = S("Redstone Trail (@1)", nodeid)
 			desc_on = S("Powered Redstone Trail (@1)", nodeid)
@@ -247,6 +252,8 @@ S("Read the help entries on the other redstone components to learn how redstone 
 		mesecon.register_node(":mesecons:wire_"..nodeid, {
 			drawtype = "nodebox",
 			paramtype = "light",
+			paramtype2 = "color4dir",
+			palette = "redstone-palette.png",
 			use_texture_alpha = minetest.features.use_texture_alpha_string_modes and "clip" or true,
 			sunlight_propagates = true,
 			selection_box = selectionbox,

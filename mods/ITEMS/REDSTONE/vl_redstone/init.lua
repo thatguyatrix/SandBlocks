@@ -245,7 +245,7 @@ local function update_node(pos, node)
 			     ",conductor.offstate="..tostring(conductor.offstate)
 			)
 			--]]
-			node.param2 = strength
+			node.param2 = strength * 4
 			node.name = new_node_name
 			minetest_swap_node(pos, node)
 		end
