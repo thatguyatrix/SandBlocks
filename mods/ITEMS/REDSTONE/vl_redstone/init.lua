@@ -54,8 +54,10 @@ local function get_input_rules_hash(mesecons, input_rules)
 	-- Build the rules
 	local input_rules_hash = {}
 	redstone.input_rules_hash = input_rules_hash
-	for i=1,#input_rules do
-		input_rules_hash[hash_from_direction(input_rules[i])] = true
+	if input_rules then
+		for i=1,#input_rules do
+			input_rules_hash[hash_from_direction(input_rules[i])] = true
+		end
 	end
 
 	return input_rules_hash
