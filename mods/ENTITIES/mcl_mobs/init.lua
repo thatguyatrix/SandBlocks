@@ -6,6 +6,9 @@ local modname = minetest.get_current_modname()
 local path = minetest.get_modpath(modname)
 local S = minetest.get_translator(modname)
 mcl_mobs.fallback_node = minetest.registered_aliases["mapgen_dirt"] or "mcl_core:dirt"
+
+dofile(path .. "/functions.lua")
+
 --api and helpers
 -- effects: sounds and particles mostly
 dofile(path .. "/effects.lua")
