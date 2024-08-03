@@ -36,6 +36,7 @@ minetest.register_node("mcl_farming:beetroot_0", {
 	groups = {dig_immediate=3, not_in_creative_inventory=1,plant=1,attached_node=1,dig_by_water=1,destroy_by_lava_flow=1,dig_by_piston=1},
 	sounds = mcl_sounds.node_sound_leaves_defaults(),
 	_mcl_blast_resistance = 0,
+	_vl_pickblock = "mcl_farming:beetroot_seeds",
 })
 
 minetest.register_node("mcl_farming:beetroot_1", {
@@ -60,6 +61,7 @@ minetest.register_node("mcl_farming:beetroot_1", {
 	groups = {dig_immediate=3, not_in_creative_inventory=1,plant=1,attached_node=1,dig_by_water=1,destroy_by_lava_flow=1,dig_by_piston=1},
 	sounds = mcl_sounds.node_sound_leaves_defaults(),
 	_mcl_blast_resistance = 0,
+	_vl_pickblock = "mcl_farming:beetroot_seeds",
 })
 
 minetest.register_node("mcl_farming:beetroot_2", {
@@ -84,6 +86,7 @@ minetest.register_node("mcl_farming:beetroot_2", {
 	groups = {dig_immediate=3, not_in_creative_inventory=1,plant=1,attached_node=1,dig_by_water=1,destroy_by_lava_flow=1,dig_by_piston=1},
 	sounds = mcl_sounds.node_sound_leaves_defaults(),
 	_mcl_blast_resistance = 0,
+	_vl_pickblock = "mcl_farming:beetroot_seeds",
 })
 
 minetest.register_node("mcl_farming:beetroot", {
@@ -135,6 +138,7 @@ minetest.register_node("mcl_farming:beetroot", {
 	groups = {dig_immediate=3, not_in_creative_inventory=1,plant=1,attached_node=1,dig_by_water=1,destroy_by_lava_flow=1,dig_by_piston=1,beetroot=4},
 	sounds = mcl_sounds.node_sound_leaves_defaults(),
 	_mcl_blast_resistance = 0,
+	_vl_pickblock = "mcl_farming:beetroot_seeds",
 })
 
 minetest.register_craftitem("mcl_farming:beetroot_item", {
