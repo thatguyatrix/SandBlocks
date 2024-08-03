@@ -265,8 +265,8 @@ local function air_leaf(leaftype)
 	end
 end
 
--- Check if a node stops a tree from growing.  Torches, plants, wood, tree,
--- leaves and dirt does not affect tree growth.
+-- Check if a node stops a tree from growing. Torches, plants, wood, tree,
+-- leaves, dirt and buildable nodes do not affect tree growth.
 local function node_stops_growth(node)
 	if node.name == "air" then
 		return false
@@ -282,7 +282,7 @@ local function node_stops_growth(node)
 		return true
 	end
 	if groups.plant or groups.torch or groups.dirt or groups.tree
-		or groups.bark or groups.leaves or groups.wood then
+		or groups.bark or groups.leaves or groups.wood or def.buildable_to then
 		return false
 	end
 
