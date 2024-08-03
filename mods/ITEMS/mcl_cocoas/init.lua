@@ -100,6 +100,7 @@ local crop_def = {
 	on_rotate = false,
 	_mcl_blast_resistance = 3,
 	_mcl_hardness = 0.2,
+	_vl_pickblock = "mcl_cocoas:cocoa_beans",
 }
 
 -- 2nd stage
@@ -160,16 +161,16 @@ minetest.register_craftitem("mcl_cocoas:cocoa_beans", {
 })
 
 minetest.register_abm({
-		label = "Cocoa pod growth",
-		nodenames = {"mcl_cocoas:cocoa_1", "mcl_cocoas:cocoa_2"},
-		-- Same as potatoes
-		-- TODO: Tweak/balance the growth speed
-		interval = 50,
-		chance = 20,
-		action = function(pos, node)
-			mcl_cocoas.grow(pos)
-		end
-}	)
+	label = "Cocoa pod growth",
+	nodenames = {"mcl_cocoas:cocoa_1", "mcl_cocoas:cocoa_2"},
+	-- Same as potatoes
+	-- TODO: Tweak/balance the growth speed
+	interval = 50,
+	chance = 20,
+	action = function(pos, node)
+		mcl_cocoas.grow(pos)
+	end
+})
 
 -- Add entry aliases for the Help
 if minetest.get_modpath("doc") then
