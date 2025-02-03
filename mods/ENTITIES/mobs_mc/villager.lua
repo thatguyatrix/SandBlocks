@@ -818,7 +818,7 @@ local function find_closest_bed (self)
 
 			if (owned_by and owned_by == self._id) then
 				mcl_log("Clear as already owned by me.")
-				bed_meta:set_string("villager", nil)
+				bed_meta:set_string("villager", "")
 				owned_by = nil
 			end
 
@@ -952,6 +952,9 @@ local function go_home(entity, sleep)
 			entity.order = nil
 			return
 		end
+		-- in case pathfinding fails, turn into the right direction anyways
+		local p = entity.object:get_pos()
+		entity:turn_in_direction(b.x - p.x, b.z - p.z, 8)
 
 		entity:gopath(b,function(entity,b)
 			local b = entity._bed
@@ -1049,14 +1052,18 @@ local function has_summon_participants(self)
 end
 
 local function summon_golem(self)
-	vector.offset(self.object:get_pos(),-10,-10,-10)
-	local nn = minetest.find_nodes_in_area_under_air(vector.offset(self.object:get_pos(),-10,-10,-10),vector.offset(self.object:get_pos(),10,10,10),{"group:solid","group:water"})
-	table.shuffle(nn)
-	for _,n in pairs(nn) do
-		local up = minetest.find_nodes_in_area(vector.offset(n,0,1,0),vector.offset(n,0,3,0),{"air"})
-		if up and #up >= 3 then
+	local pos = self.object:get_pos()
+	local p1 = vector.offset(pos, -10, -10, -10)
+	local p2 = vector.offset(pos,  10,  10,  10)
+	local nn = minetest.find_nodes_in_area_under_air(p1, p2,{"group:solid","group:water"})
+	while #nn > 0 do
+		local n = table.remove_random_element(nn)
+		n.y = n.y + 1
+
+		local summon = mcl_mobs.spawn(n, "mobs_mc:iron_golem")
+		if summon then
 			minetest.sound_play("mcl_portals_open_end_portal", {pos=n, gain=0.5, max_hear_distance = 16}, true)
-			return minetest.add_entity(vector.offset(n,0,1,0),"mobs_mc:iron_golem")
+			return summon
 		end
 	end
 end
@@ -1279,7 +1286,7 @@ local function validate_jobsite(self)
 		mcl_log("Jobsite far, so resettle: " .. tostring(resettle))
 		if resettle then
 			local m = minetest.get_meta(self._jobsite)
-			m:set_string("villager", nil)
+			m:set_string("villager", "")
 			remove_job (self)
 			return false
 		end
@@ -1327,7 +1334,7 @@ local function do_work (self)
 					--mcl_log("Jobsite not valid")
 					return false
 				end
-				if vector.distance(self.object:get_pos(),self._jobsite) < 2 then
+				if vector.distance(self.object:get_pos(),self._jobsite) < 1.5 then
 					--mcl_log("Made it to work ok callback!")
 					return true
 				else
@@ -1421,7 +1428,7 @@ local function validate_bed(self)
 	mcl_log("Bed far, so resettle: " .. tostring(resettle))
 	if resettle then
 		mcl_log("Resettled. Ditch bed.")
-		m:set_string("villager", nil)
+		m:set_string("villager", "")
 		self._bed = nil
 		bed_valid = false
 		return false
@@ -1431,7 +1438,7 @@ local function validate_bed(self)
 	mcl_log("Player owner: " .. owned_by_player)
 	if owned_by_player ~= "" then
 		mcl_log("Player owns this. Villager won't take this.")
-		m:set_string("villager", nil)
+		m:set_string("villager", "")
 		self._bed = nil
 		bed_valid = false
 		return false
@@ -2106,8 +2113,8 @@ mcl_mobs.register_mob("mobs_mc:villager", {
 	hp_min = 20,
 	hp_max = 20,
 	head_swivel = "head.control",
-	bone_eye_height = 6.3,
-	head_eye_height = 2.2,
+	head_eye_height = 1.5,
+	head_bone_position = vector.new( 0, 6.3, 0 ), -- for minetest <= 5.8
 	curiosity = 10,
 	runaway = true,
 	collisionbox = {-0.3, -0.01, -0.3, 0.3, 1.94, 0.3},
@@ -2300,13 +2307,13 @@ mcl_mobs.register_mob("mobs_mc:villager", {
 		local bed = self._bed
 		if bed then
 			local bed_meta = minetest.get_meta(bed)
-			bed_meta:set_string("villager", nil)
+			bed_meta:set_string("villager", "")
 			mcl_log("Died, so bye bye bed")
 		end
 		local jobsite = self._jobsite
 		if jobsite then
 			local jobsite_meta = minetest.get_meta(jobsite)
-			jobsite_meta:set_string("villager", nil)
+			jobsite_meta:set_string("villager", "")
 			mcl_log("Died, so bye bye jobsite")
 		end
 

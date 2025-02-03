@@ -10,12 +10,12 @@ local overworld_sky_threshold = tonumber(minetest.settings:get("mcl_mobs_overwor
 local overworld_passive_threshold = tonumber(minetest.settings:get("mcl_mobs_overworld_passive_threshold")) or 7
 
 local get_node                     = minetest.get_node
-local get_item_group               = minetest.get_item_group
 local get_node_light               = minetest.get_node_light
 local find_nodes_in_area_under_air = minetest.find_nodes_in_area_under_air
 local mt_get_biome_name            = minetest.get_biome_name
 local get_objects_inside_radius    = minetest.get_objects_inside_radius
 local get_connected_players        = minetest.get_connected_players
+local registered_nodes             = minetest.registered_nodes
 
 local math_min       = math.min
 local math_max       = math.max
@@ -25,6 +25,7 @@ local math_ceil      = math.ceil
 local math_cos       = math.cos
 local math_sin       = math.sin
 local math_sqrt      = math.sqrt
+local math_abs       = math.abs
 
 local vector_distance = vector.distance
 local vector_new      = vector.new
@@ -35,18 +36,14 @@ local table_remove   = table.remove
 local pairs = pairs
 
 local logging = minetest.settings:get_bool("mcl_logging_mobs_spawn", false)
-local function mcl_log (message, property)
-	if logging then
-		if property then
-			message = message .. ": " .. dump(property)
-		end
-		mcl_util.mcl_log (message, "[Mobs spawn]", true)
-	end
+local function mcl_log(message, property)
+	if property then message = message .. ": " .. dump(property) end
+	mcl_util.mcl_log(message, "[Mobs spawn]", true)
 end
+if not logging then mcl_log = function() end end
 
 local dbg_spawn_attempts = 0
 local dbg_spawn_succ = 0
-local dbg_spawn_counts = {}
 
 local remove_far = true
 
@@ -99,169 +96,6 @@ mcl_log("Percentage of hostile spawns are group: " .. hostile_group_percentage_s
 local mobs_spawn = minetest.settings:get_bool("mobs_spawn", true) ~= false
 local spawn_protected = minetest.settings:get_bool("mobs_spawn_protected") ~= false
 
--- THIS IS THE BIG LIST OF ALL BIOMES - used for programming/updating mobs
--- Also used for missing parameter
--- Please update the list when adding new biomes!
-
-local list_of_all_biomes = {
-
-	-- underground:
-
-	"FlowerForest_underground",
-	"JungleEdge_underground",
-	"ColdTaiga_underground",
-	"IcePlains_underground",
-	"IcePlainsSpikes_underground",
-	"MegaTaiga_underground",
-	"Taiga_underground",
-	"ExtremeHills+_underground",
-	"JungleM_underground",
-	"ExtremeHillsM_underground",
-	"JungleEdgeM_underground",
-	"MangroveSwamp_underground",
-
-	-- ocean:
-
-	"RoofedForest_ocean",
-	"JungleEdgeM_ocean",
-	"BirchForestM_ocean",
-	"BirchForest_ocean",
-	"IcePlains_deep_ocean",
-	"Jungle_deep_ocean",
-	"Savanna_ocean",
-	"MesaPlateauF_ocean",
-	"ExtremeHillsM_deep_ocean",
-	"Savanna_deep_ocean",
-	"SunflowerPlains_ocean",
-	"Swampland_deep_ocean",
-	"Swampland_ocean",
-	"MegaSpruceTaiga_deep_ocean",
-	"ExtremeHillsM_ocean",
-	"JungleEdgeM_deep_ocean",
-	"SunflowerPlains_deep_ocean",
-	"BirchForest_deep_ocean",
-	"IcePlainsSpikes_ocean",
-	"Mesa_ocean",
-	"StoneBeach_ocean",
-	"Plains_deep_ocean",
-	"JungleEdge_deep_ocean",
-	"SavannaM_deep_ocean",
-	"Desert_deep_ocean",
-	"Mesa_deep_ocean",
-	"ColdTaiga_deep_ocean",
-	"Plains_ocean",
-	"MesaPlateauFM_ocean",
-	"Forest_deep_ocean",
-	"JungleM_deep_ocean",
-	"FlowerForest_deep_ocean",
-	"MushroomIsland_ocean",
-	"MegaTaiga_ocean",
-	"StoneBeach_deep_ocean",
-	"IcePlainsSpikes_deep_ocean",
-	"ColdTaiga_ocean",
-	"SavannaM_ocean",
-	"MesaPlateauF_deep_ocean",
-	"MesaBryce_deep_ocean",
-	"ExtremeHills+_deep_ocean",
-	"ExtremeHills_ocean",
-	"MushroomIsland_deep_ocean",
-	"Forest_ocean",
-	"MegaTaiga_deep_ocean",
-	"JungleEdge_ocean",
-	"MesaBryce_ocean",
-	"MegaSpruceTaiga_ocean",
-	"ExtremeHills+_ocean",
-	"Jungle_ocean",
-	"RoofedForest_deep_ocean",
-	"IcePlains_ocean",
-	"FlowerForest_ocean",
-	"ExtremeHills_deep_ocean",
-	"MesaPlateauFM_deep_ocean",
-	"Desert_ocean",
-	"Taiga_ocean",
-	"BirchForestM_deep_ocean",
-	"Taiga_deep_ocean",
-	"JungleM_ocean",
-	"MangroveSwamp_ocean",
-	"MangroveSwamp_deep_ocean",
-
-	-- water or beach?
-
-	"MesaPlateauFM_sandlevel",
-	"MesaPlateauF_sandlevel",
-	"MesaBryce_sandlevel",
-	"Mesa_sandlevel",
-
-	-- beach:
-
-	"FlowerForest_beach",
-	"Forest_beach",
-	"StoneBeach",
-	"ColdTaiga_beach_water",
-	"Taiga_beach",
-	"Savanna_beach",
-	"Plains_beach",
-	"ExtremeHills_beach",
-	"ColdTaiga_beach",
-	"Swampland_shore",
-	"MushroomIslandShore",
-	"JungleM_shore",
-	"Jungle_shore",
-	"BambooJungleM_shore",
-	"BambooJungle_shore",
-	"MangroveSwamp_shore",
-
-	-- dimension biome:
-
-	"Nether",
-	"BasaltDelta",
-	"CrimsonForest",
-	"WarpedForest",
-	"SoulsandValley",
-	"End",
-
-	-- Overworld regular:
-
-	"Mesa",
-	"FlowerForest",
-	"Swampland",
-	"Taiga",
-	"ExtremeHills",
-	"ExtremeHillsM",
-	"ExtremeHills+_snowtop",
-	"Jungle",
-	"Savanna",
-	"BirchForest",
-	"MegaSpruceTaiga",
-	"MegaTaiga",
-	"ExtremeHills+",
-	"Forest",
-	"Plains",
-	"Desert",
-	"ColdTaiga",
-	"MushroomIsland",
-	"IcePlainsSpikes",
-	"SunflowerPlains",
-	"IcePlains",
-	"RoofedForest",
-	"ExtremeHills+_snowtop",
-	"MesaPlateauFM_grasstop",
-	"JungleEdgeM",
-	"JungleM",
-	"BirchForestM",
-	"MesaPlateauF",
-	"MesaPlateauFM",
-	"MesaPlateauF_grasstop",
-	"MesaBryce",
-	"JungleEdge",
-	"SavannaM",
-	"MangroveSwamp",
-	"BambooJungle",
-	"BambooJungleEdge",
-	"BambooJungleEdgeM",
-	"BambooJungleM",
-}
-
 -- count how many mobs are in an area
 local function count_mobs(pos,r,mob_type)
 	local num = 0
@@ -289,11 +123,7 @@ local function count_mobs_total(mob_type)
 end
 
 local function count_mobs_add_entry (mobs_list, mob_cat)
-	if mobs_list[mob_cat] then
-		mobs_list[mob_cat] = mobs_list[mob_cat] + 1
-	else
-		mobs_list[mob_cat] = 1
-	end
+	mobs_list[mob_cat] = (mobs_list[mob_cat] or 0) + 1
 end
 
 --categorise_by can be name or type or spawn_class
@@ -452,7 +282,7 @@ function mcl_mobs:spawn_setup(def)
 
 	local dimension        = def.dimension or "overworld"
 	local type_of_spawning = def.type_of_spawning or "ground"
-	local biomes           = def.biomes or list_of_all_biomes
+	local biomes           = def.biomes or nil
 	local min_light        = def.min_light or 0
 	local max_light        = def.max_light or (minetest.LIGHT_MAX + 1)
 	local chance           = def.chance or 1000
@@ -619,14 +449,14 @@ local function get_next_mob_spawn_pos(pos)
 	xoff, yoff, zoff = xoff * dd, yoff * dd, zoff * dd
 	local goal_pos = vector.offset(pos, xoff, yoff, zoff)
 
-	if not ( math.abs(goal_pos.x) <= SPAWN_MAPGEN_LIMIT and math.abs(goal_pos.y) <= SPAWN_MAPGEN_LIMIT and math.abs(goal_pos.z) <= SPAWN_MAPGEN_LIMIT ) then
+	if not (math_abs(goal_pos.x) <= SPAWN_MAPGEN_LIMIT and math_abs(goal_pos.y) <= SPAWN_MAPGEN_LIMIT and math_abs(goal_pos.z) <= SPAWN_MAPGEN_LIMIT) then
 		mcl_log("Pos outside mapgen limits: " .. minetest.pos_to_string(goal_pos))
 		return nil
 	end
 
 	-- Calculate upper/lower y limits
 	local d2 = xoff*xoff + zoff*zoff -- squared distance in x,z plane only
-	local y1 = math_sqrt( MOB_SPAWN_ZONE_OUTER_SQ - d2 ) -- absolue value of distance to outer sphere
+	local y1 = math_sqrt(MOB_SPAWN_ZONE_OUTER_SQ - d2) -- absolue value of distance to outer sphere
 
 	local y_min, y_max
 	if d2 >= MOB_SPAWN_ZONE_INNER_SQ then
@@ -635,7 +465,7 @@ local function get_next_mob_spawn_pos(pos)
 		y_max = pos.y + y1
 	else
 		-- Inner region, y range spans between inner and outer spheres
-		local y2 = math_sqrt( MOB_SPAWN_ZONE_INNER_SQ - d2 )
+		local y2 = math_sqrt(MOB_SPAWN_ZONE_INNER_SQ - d2)
 		if goal_pos.y > pos.y then
 			-- Upper hemisphere
 			y_min = pos.y + y2
@@ -680,12 +510,12 @@ end
 
 --a simple helper function for mob_spawn
 local function biome_check(biome_list, biome_goal)
+	if not biome_goal then return false end
 	for _, data in pairs(biome_list) do
 		if data == biome_goal then
 			return true
 		end
 	end
-
 	return false
 end
 
@@ -700,8 +530,8 @@ local function get_water_spawn(p)
 		end
 end
 
-local function has_room(self,pos)
-	local cb = self.collisionbox
+local function has_room(self, pos)
+	local cb = self.spawnbox or self.collisionbox
 	local nodes = {}
 	if self.fly_in then
 		local t = type(self.fly_in)
@@ -712,18 +542,74 @@ local function has_room(self,pos)
 		end
 	end
 	table.insert(nodes,"air")
-	local x = cb[4] - cb[1]
-	local y = cb[5] - cb[2]
-	local z = cb[6] - cb[3]
-	local r = math.ceil(x * y * z)
-	local p1 = vector.offset(pos,cb[1],cb[2],cb[3])
-	local p2 = vector.offset(pos,cb[4],cb[5],cb[6])
-	local n = #minetest.find_nodes_in_area(p1,p2,nodes) or 0
-	if r > n then
-		minetest.log("warning","[mcl_mobs] No room for mob "..self.name.." at "..minetest.pos_to_string(vector.round(pos)))
-		return false
+
+	-- Calculate area to check for room
+	local cb_height = cb[5] - cb[2]
+	local p1 = vector.new(
+		math.round(pos.x + cb[1]),
+		math.floor(pos.y),
+		math.round(pos.z + cb[3]))
+	local p2 = vector.new(
+		math.round(pos.x + cb[4]),
+		math.ceil(p1.y + cb_height) - 1,
+		math.round(pos.z + cb[6]))
+
+	-- Check if the entire spawn volume is free
+	local dx = p2.x - p1.x + 1
+	local dy = p2.y - p1.y + 1
+	local dz = p2.z - p1.z + 1
+	local found_nodes = minetest.find_nodes_in_area(p1,p2,nodes) or 0
+	local n = #found_nodes
+	if n == dx * dy * dz then
+		return true
 	end
-	return true
+
+	-- If we don't have an implementation of get_node_boxes, we can't check for sub-node space
+	if not minetest.get_node_boxes then return false end
+
+	-- Check if it's possible for a sub-node space check to succeed
+	local needed_in_bottom_section = dx * ( dy - 1) * dz
+	if n < needed_in_bottom_section then return false end
+
+	-- Make sure the entire volume except for the top level is free before checking the top layer
+	if dy > 1 then
+		-- Remove nodes in the top layer from the count
+		for i = 1,#found_nodes do
+			if found_nodes[i].y == p2.y then
+				n = n - 1
+			end
+		end
+
+		-- If the entire volume except the top layer isn't air (or nodes) then we can't spawn this mob here
+		if n < needed_in_bottom_section then return false end
+	end
+
+	-- Check the top layer to see if we have enough space to spawn in
+	local top_layer_height = 1
+	local processed = {}
+	for x = p1.x,p2.x do
+		for z = p1.z,p2.z do
+			local test_pos = vector.new(x,p2.y,z)
+			local node = minetest.get_node(test_pos) or { name = "ignore" }
+			local cache_name = string.format("%s-%d", node.name, node.param2)
+			if not processed[cache_name] then
+				-- Calculate node bounding box and select the lowest y value
+				local boxes = minetest.get_node_boxes("collision_box", test_pos, node)
+				for i = 1,#boxes do
+					local box = boxes[i]
+					local y_test = box[2] + 0.5
+					if y_test < top_layer_height then top_layer_height = y_test end
+
+					local y_test = box[5] + 0.5
+					if y_test < top_layer_height then top_layer_height = y_test end
+				end
+			end
+		end
+	end
+	if top_layer_height + dy - 1 >= cb_height then return true end
+
+	-- We don't have room
+	return false
 end
 
 mcl_mobs.custom_biomecheck = nil
@@ -732,118 +618,103 @@ function mcl_mobs.register_custom_biomecheck(custom_biomecheck)
 	mcl_mobs.custom_biomecheck = custom_biomecheck
 end
 
-
 local function get_biome_name(pos)
-	if mcl_mobs.custom_biomecheck then
-		return mcl_mobs.custom_biomecheck (pos)
-	else
-		local gotten_biome = minetest.get_biome_data(pos)
-
-		if not gotten_biome then
-			return
-		end
-
-		gotten_biome = mt_get_biome_name(gotten_biome.biome)
-		--minetest.log ("biome: " .. dump(gotten_biome))
-
-		return gotten_biome
-	end
+	if mcl_mobs.custom_biomecheck then return mcl_mobs.custom_biomecheck(pos) end
+	local gotten_biome = minetest.get_biome_data(pos)
+	return gotten_biome and mt_get_biome_name(gotten_biome.biome)
 end
 
 local function spawn_check(pos, spawn_def)
 	if not spawn_def or not pos then return end
-
 	dbg_spawn_attempts = dbg_spawn_attempts + 1
+
 	local dimension = mcl_worlds.pos_to_dimension(pos)
-	local mob_def = minetest.registered_entities[spawn_def.name]
-	local mob_type = mob_def.type
-	local gotten_node = get_node(pos).name
-	if not gotten_node then return end
-
-	local biome_name = get_biome_name(pos)
-	if not biome_name then return end
-
-	local is_ground = minetest.get_item_group(gotten_node,"solid") ~= 0
-	if not is_ground then
+	if spawn_def.dimension ~= dimension then return end -- wrong dimension
+	-- find ground node below spawn position
+	local node_name = get_node(pos).name
+	local node_def = registered_nodes[node_name]
+	if node_def and not node_def.groups.solid then -- try node one below instead
 		pos.y = pos.y - 1
-		gotten_node = get_node(pos).name
-		is_ground = minetest.get_item_group(gotten_node,"solid") ~= 0
+		node_name = get_node(pos).name
+		node_def = registered_nodes[node_name]
 	end
+	if not node_def or not node_def.groups then return end
+	-- do not spawn on bedrock
+	if node_name == "mcl_core:bedrock" then return end
 	pos.y = pos.y + 1
-	local is_water = get_item_group(gotten_node, "water") ~= 0
-	local is_lava  = get_item_group(gotten_node, "lava") ~= 0
-	local is_leaf  = get_item_group(gotten_node, "leaves") ~= 0
-	local is_bedrock  = gotten_node == "mcl_core:bedrock"
-	local is_grass = minetest.get_item_group(gotten_node,"grass_block") ~= 0
+	-- check spawn height
+	if pos.y < spawn_def.min_height or pos.y > spawn_def.max_height then return end
+	mcl_log("spawn_check#1 position checks passed")
 
-	if pos.y >= spawn_def.min_height
-			and pos.y <= spawn_def.max_height
-			and spawn_def.dimension == dimension
-			and biome_check(spawn_def.biomes, biome_name) then
+	-- do not spawn ground mobs on leaves
+	if spawn_def.type_of_spawning == "ground" and (not node_def.groups.solid or node_def.groups.leaves) then return end
+	-- water mobs only on water
+	if spawn_def.type_of_spawning == "water" and not node_def.groups.water then return end
+	-- lava mobs only on lava
+	if spawn_def.type_of_spawning == "lava" and not node_def.groups.lava then return end
+	-- farm animals on grass only
+	if is_farm_animal(spawn_def.name) and not node_def.groups.grass_block then return end
 
-		mcl_log("Spawn level 1 check - Passed")
-		if  (is_ground or spawn_def.type_of_spawning ~= "ground")
-				and (spawn_def.type_of_spawning ~= "ground" or not is_leaf)
-				and (not is_farm_animal(spawn_def.name) or is_grass)
-				and (spawn_def.type_of_spawning ~= "water" or is_water)
-				and not is_bedrock
-				and has_room(mob_def,pos)
-				and (spawn_def.check_position and spawn_def.check_position(pos) or spawn_def.check_position == nil)
-				and ( not spawn_protected or not minetest.is_protected(pos, "") ) then
+	---- More expensive calls:
+	-- check the biome
+	if spawn_def.biomes and not biome_check(spawn_def.biomes, get_biome_name(pos)) then return end
+	-- check if there is enough room
+	local mob_def = minetest.registered_entities[spawn_def.name]
+	if not has_room(mob_def,pos) then return end
+	-- additional checks (slime etc.)
+	if spawn_def.check_position and not spawn_def.check_position(pos) then return end
+	if spawn_protected and minetest.is_protected(pos, "") then return end
+	mcl_log("spawn_check#2 advanced checks passed")
 
-			mcl_log("Spawn level 2 check - Passed")
-			local gotten_light = get_node_light(pos)
+	-- check light thresholds
+	local gotten_light = get_node_light(pos)
+	-- old lighting
+	if not modern_lighting then return gotten_light >= spawn_def.min_light and gotten_light <= spawn_def.max_light end
 
-			if modern_lighting then
-				local my_node = get_node(pos)
-				local sky_light = minetest.get_natural_light(pos)
-				local art_light = minetest.get_artificial_light(my_node.param1)
-
-				if mob_def.spawn_check then
-					return mob_def.spawn_check(pos, gotten_light, art_light, sky_light)
-				elseif mob_type == "monster" then
-					if dimension == "nether" then
-						if art_light <= nether_threshold then
-							return true
-						end
-					elseif dimension == "end" then
-						if art_light <= end_threshold then
-							return true
-						end
-					elseif dimension == "overworld" then
-						if art_light <= overworld_threshold and sky_light <= overworld_sky_threshold then
-							return true
-						end
-					end
-				else
-					-- passive threshold is apparently the same in all dimensions ...
-					if gotten_light > overworld_passive_threshold then
-						return true
-					end
-				end
-			else
-				if gotten_light >= spawn_def.min_light and gotten_light <= spawn_def.max_light then
-					return true
-				end
+	local sky_light = minetest.get_natural_light(pos)
+	local art_light = minetest.get_artificial_light(get_node(pos).param1)
+	if mob_def.spawn_check then
+		return mob_def.spawn_check(pos, gotten_light, art_light, sky_light)
+	end
+	if mob_def.type == "monster" then
+		if dimension == "nether" then
+			if art_light <= nether_threshold then
+				return true
+			end
+		elseif dimension == "end" then
+			if art_light <= end_threshold then
+				return true
+			end
+		elseif dimension == "overworld" then
+			if art_light <= overworld_threshold and sky_light <= overworld_sky_threshold then
+				return true
 			end
 		end
+		return false
 	end
-	return false
+	-- passive threshold is apparently the same in all dimensions ...
+	return gotten_light > overworld_passive_threshold
 end
 
 function mcl_mobs.spawn(pos,id)
+	if not pos or not id then return false end
 	local def = minetest.registered_entities[id] or minetest.registered_entities["mobs_mc:"..id] or minetest.registered_entities["extra_mobs:"..id]
-	if not def or (def.can_spawn and not def.can_spawn(pos)) or not def.is_mob then
-		return false
+	if not def or not def.is_mob or (def.can_spawn and not def.can_spawn(pos)) then return false end
+	if not has_room(def, pos) then return false end
+	local obj = minetest.add_entity(pos, def.name)
+	-- initialize head bone
+	if def.head_swivel and def.head_bone_position then
+		if obj and obj.get_bone_override then -- minetest >= 5.9
+			obj:set_bone_override(def.head_swivel, {
+				position = { vec = def.head_bone_position, absolute = true },
+				rotation = { vec = vector.zero(), absolute = true }
+			})
+		else -- minetest < 5.9
+			obj:set_bone_position(def.head_swivel, def.head_bone_position, vector.zero())
+		end
 	end
-	if not dbg_spawn_counts[def.name] then
-		dbg_spawn_counts[def.name] = 1
-	else
-		dbg_spawn_counts[def.name] = dbg_spawn_counts[def.name] + 1
-	end
-	return minetest.add_entity(pos, def.name)
+	return obj
 end
-
 
 local function spawn_group(p,mob,spawn_on,amount_to_spawn)
 	local nn= minetest.find_nodes_in_area_under_air(vector.offset(p,-5,-3,-5),vector.offset(p,5,3,5),spawn_on)
@@ -1238,7 +1109,6 @@ end
 minetest.register_chatcommand("mobstats",{
 	privs = { debug = true },
 	func = function(n,param)
-		--minetest.chat_send_player(n,dump(dbg_spawn_counts))
 		local pos = minetest.get_player_by_name(n):get_pos()
 		minetest.chat_send_player(n,"mobs: within 32 radius of player/total loaded :"..count_mobs(pos,MOB_CAP_INNER_RADIUS) .. "/" .. count_mobs_total())
 		minetest.chat_send_player(n,"spawning attempts since server start:" .. dbg_spawn_succ .. "/" .. dbg_spawn_attempts)

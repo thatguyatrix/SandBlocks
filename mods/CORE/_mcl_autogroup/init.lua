@@ -1,6 +1,6 @@
 --[[
 This mod implements a HACK to make 100% sure the digging times of all tools
-match Minecraft's perfectly.  The digging times system of Minetest is very
+match Minecraft's perfectly.  The digging times system of Luanti is very
 different, so this weird group trickery has to be used.  In Minecraft, each
 block has a hardness and the actual Minecraft digging time is determined by
 this:
@@ -62,8 +62,8 @@ Information about the mod
 The mod is split up into two parts, mcl_autogroup and _mcl_autogroup.
 mcl_autogroup contains the API functions used to register custom digging groups.
 _mcl_autogroup contains most of the code.  The leading underscore in the name
-"_mcl_autogroup" is used to force Minetest to load that part of the mod as late
-as possible.  Minetest loads mods in reverse alphabetical order.
+"_mcl_autogroup" is used to force Luanti to load that part of the mod as late
+as possible.  Luanti loads mods in reverse alphabetical order.
 
 This also means that it is very important that no mod adds _mcl_autogroup as a
 dependency.
@@ -116,10 +116,6 @@ end
 
 -- Array of unique hardness values for each group which affects dig time.
 local hardness_values = get_hardness_values_for_groups()
-
--- Map indexed by hardness values which return the index of that value in
--- hardness_value.  Used for quick lookup.
-local hardness_lookup = get_hardness_lookup_for_groups(hardness_values)
 
 --[[local function compute_creativetimes(group)
 	local creativetimes = {}
@@ -186,6 +182,7 @@ local function add_groupcaps(toolname, groupcaps, groupcaps_def, efficiency)
 		local mult = capsdef.speed or 1
 		local uses = capsdef.uses
 		local def = mcl_autogroup.registered_diggroups[g]
+		assert(def, toolname .. " has unknown diggroup '" .. dump(g) .. "'")
 		local max_level = def.levels and #def.levels or 1
 
 		assert(capsdef.level, toolname .. ' is missing level for ' .. g)
@@ -313,6 +310,13 @@ function mcl_autogroup.get_wear(toolname, diggroup)
 end
 
 local function overwrite()
+	-- Refresh, now that all groups are known.
+	hardness_values = get_hardness_values_for_groups()
+
+	-- Map indexed by hardness values which return the index of that value in
+	-- hardness_value.  Used for quick lookup.
+	local hardness_lookup = get_hardness_lookup_for_groups(hardness_values)
+
 	for nname, ndef in pairs(minetest.registered_nodes) do
 		local newgroups = table.copy(ndef.groups)
 		if (nname ~= "ignore" and ndef.diggable) then
@@ -374,4 +378,5 @@ local function overwrite()
 	end
 end
 
-overwrite()
+-- Make sure all tools and groups are registered
+minetest.register_on_mods_loaded(overwrite)

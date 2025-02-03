@@ -48,6 +48,20 @@ function table.pairs_by_keys(t, f)
 	return iter
 end
 
+-- Removes one element randomly selected from the array section of the table and
+-- returns it, or nil if there are no elements in the array section of the table
+function table.remove_random_element(table)
+	local count = #table
+	if count == 0 then return nil end
+
+	local idx = math.random(count)
+	local res = table[idx]
+	table[idx] = table[count]
+	table[count] = nil
+	count = count - 1
+	return res
+end
+
 local LOGGING_ON = minetest.settings:get_bool("mcl_logging_default", false)
 local LOG_MODULE = "[MCL2]"
 function mcl_util.mcl_log(message, module, bypass_default_logger)
@@ -112,7 +126,7 @@ function mcl_util.validate_vector (vect)
 	return false
 end
 
--- Minetest 5.3.0 or less can only measure the light level. This came in at 5.4
+-- Luanti 5.3.0 or less can only measure the light level. This came in at 5.4
 -- This function has been known to fail in multiple places so the error handling is added increase safety and improve
 -- debugging. See:
 -- https://git.minetest.land/VoxeLibre/VoxeLibre/issues/1392
@@ -153,7 +167,7 @@ field is false or omitted (else, the itemstack is not changed).
   orientation on wall
 
 This function is a simplified version of minetest.rotate_and_place.
-The Minetest function is seen as inappropriate because this includes mirror
+The Luanti function is seen as inappropriate because this includes mirror
 images of possible orientations, causing problems with pillar shadings.
 ]]
 function mcl_util.rotate_axis_and_place(itemstack, placer, pointed_thing, infinitestacks, invert_wall)
@@ -745,7 +759,7 @@ end
 ---@return fun(itemstack: ItemStack, placer: ObjectRef, pointed_thing: pointed_thing, param2: integer): ItemStack?
 function mcl_util.bypass_buildable_to(func)
 	--------------------------
-	-- MINETEST CODE: UTILS --
+	-- LUANTI CODE: UTILS ----
 	--------------------------
 
 	local function copy_pointed_thing(pointed_thing)
@@ -814,7 +828,7 @@ function mcl_util.bypass_buildable_to(func)
 
 	return function(itemstack, placer, pointed_thing, param2)
 		-------------------
-		-- MINETEST CODE --
+		-- LUANTI CODE ----
 		-------------------
 		local def = itemstack:get_definition()
 		if def.type ~= "node" or pointed_thing.type ~= "node" then
@@ -860,7 +874,7 @@ function mcl_util.bypass_buildable_to(func)
 		end
 
 		-------------------
-		-- MINETEST CODE --
+		-- LUANTI CODE ----
 		-------------------
 
 		if minetest.is_protected(place_to, playername) then
@@ -1102,4 +1116,40 @@ function mcl_util.is_it_christmas()
 	else
 		return false
 	end
+end
+
+function mcl_util.to_bool(val)
+	if not val then return false end
+	return true
+end
+
+if not vector.in_area then
+	-- backport from minetest 5.8, can be removed when the minimum version is 5.8
+	vector.in_area = function(pos, min, max)
+		return (pos.x >= min.x) and (pos.x <= max.x) and
+		       (pos.y >= min.y) and (pos.y <= max.y) and
+		       (pos.z >= min.z) and (pos.z <= max.z)
+	end
+end
+
+-- Traces along a line of nodes vertically to find the next possition that isn't an allowed node
+---@param pos The position to start tracing from
+---@param dir The direction to trace in. 1 is up, -1 is down, all other values are not allowed.
+---@param allowed_nodes A set of node names to trace along.
+---@param limit The maximum number of steps to make. Defaults to 16 if nil or missing
+---@return Three return values:
+---   the position of the next node that isn't allowed or nil if no such node was found,
+---   the distance from the start where that node was found,
+---   the node table if a node was found
+function mcl_util.trace_nodes(pos, dir, allowed_nodes, limit)
+	if (dir ~= -1) and (dir ~= 1) then return nil, 0, nil end
+	limit = limit or 16
+
+	for i = 1,limit do
+		pos = vector.offset(pos, 0, dir, 0)
+		local node = minetest.get_node(pos)
+		if not allowed_nodes[node.name] then return pos, i, node end
+	end
+
+	return nil, limit, nil
 end

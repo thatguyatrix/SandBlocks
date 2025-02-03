@@ -280,7 +280,7 @@ minetest.register_globalstep(function(dtime)
 							pos = fly_pos,
 							velocity = vector.zero(),
 							acceleration = vector.zero(),
-							expirationtime = math.random(0.3, 0.5),
+							expirationtime = 0.3 + math.random() * 0.2,
 							size = math.random(1, 2),
 							collisiondetection = false,
 							vertical = false,
@@ -407,13 +407,23 @@ minetest.register_globalstep(function(dtime)
 			set_bone_pos(player,"Body_Control", nil, vector.new(0, -player_vel_yaw + yaw, 0))
 		end
 
-		local underwater
-		if get_item_group(mcl_playerinfo[name].node_head, "water") ~= 0 and underwater ~= true then
-			mcl_weather.skycolor.update_sky_color()
-			local underwater = true
-		elseif get_item_group(mcl_playerinfo[name].node_head, "water") == 0 and underwater == true then
-			mcl_weather.skycolor.update_sky_color()
-			local underwater = false
+		local playerinfo = mcl_playerinfo[name] or {}
+		local plusinfo = playerinfo.mcl_playerplus
+		if not plusinfo then
+			plusinfo = {}
+			playerinfo.mcl_playerplus = plusinfo
+		end
+
+		-- Only process if node_head changed
+		if plusinfo.old_node_head ~= playerinfo.node_head then
+			local node_head = playerinfo.node_head or ""
+			local old_node_head = plusinfo.old_node_head or ""
+			plusinfo.old_node_head = playerinfo.node_head
+
+			-- Update skycolor if moving in or out of water
+			if (get_item_group(node_head, "water") == 0) ~= (get_item_group(old_node_head, "water") == 0) then
+				mcl_weather.skycolor.update_sky_color()
+			end
 		end
 
 		elytra.last_yaw = player:get_look_horizontal()
@@ -504,31 +514,43 @@ minetest.register_globalstep(function(dtime)
 			return
 		end
 
-		-- Standing on soul sand? If so, walk slower (unless player wears Soul Speed boots)
-		if node_stand == "mcl_nether:soul_sand" then
-			-- TODO: Tweak walk speed
-			-- TODO: Also slow down mobs
-			-- Slow down even more when soul sand is above certain block
-			local boots = player:get_inventory():get_stack("armor", 5)
-			local soul_speed = mcl_enchanting.get_enchantment(boots, "soul_speed")
-			if soul_speed > 0 then
-				playerphysics.add_physics_factor(player, "speed", "mcl_playerplus:surface", soul_speed * 0.105 + 1.3)
-			else
-				if node_stand_below == "mcl_core:ice" or node_stand_below == "mcl_core:packed_ice" or node_stand_below == "mcl_core:slimeblock" or node_stand_below == "mcl_core:water_source" then
-					playerphysics.add_physics_factor(player, "speed", "mcl_playerplus:surface", 0.1)
-				else
-					playerphysics.add_physics_factor(player, "speed", "mcl_playerplus:surface", 0.4)
-				end
-			end
-		elseif get_item_group(node_feet, "liquid") ~= 0 and mcl_enchanting.get_enchantment(player:get_inventory():get_stack("armor", 5), "depth_strider") then
-			local boots = player:get_inventory():get_stack("armor", 5)
-			local depth_strider = mcl_enchanting.get_enchantment(boots, "depth_strider")
+		local boots = player:get_inventory():get_stack("armor", 5)
+		local soul_speed = mcl_enchanting.get_enchantment(boots, "soul_speed")
 
-			if depth_strider > 0 then
-				playerphysics.add_physics_factor(player, "speed", "mcl_playerplus:surface", (depth_strider / 3) + 0.75)
+		-- Standing on a soul block? If so, check for speed bonus / penalty
+		if get_item_group(node_stand, "soul_block") ~= 0 then
+			
+			-- Standing on soul sand? If so, walk slower (unless player wears Soul Speed boots, then apply bonus)
+			if node_stand == "mcl_nether:soul_sand" then
+				-- TODO: Tweak walk speed
+				-- TODO: Also slow down mobs
+				-- Slow down even more when soul sand is above certain block
+				if soul_speed > 0 then
+					playerphysics.add_physics_factor(player, "speed", "mcl_playerplus:soul_speed", soul_speed * 0.105 + 1.3)
+				else
+					if node_stand_below == "mcl_core:ice" or node_stand_below == "mcl_core:packed_ice" or node_stand_below == "mcl_core:slimeblock" or node_stand_below == "mcl_core:water_source" then
+						playerphysics.add_physics_factor(player, "speed", "mcl_playerplus:soul_speed", 0.1)
+					else
+						playerphysics.add_physics_factor(player, "speed", "mcl_playerplus:soul_speed", 0.4)
+					end
+				end
+			elseif soul_speed > 0 then
+				-- Standing on a different soul block? If so, apply Soul Speed bonus unconditionally
+				playerphysics.add_physics_factor(player, "speed", "mcl_playerplus:soul_speed", soul_speed * 0.105 + 1.3)
 			end
 		else
-			playerphysics.remove_physics_factor(player, "speed", "mcl_playerplus:surface")
+			playerphysics.remove_physics_factor(player, "speed", "mcl_playerplus:soul_speed")
+		end
+		if get_item_group(node_feet, "liquid") ~= 0 and mcl_enchanting.get_enchantment(player:get_inventory():get_stack("armor", 5), "depth_strider") then
+			local boots = player:get_inventory():get_stack("armor", 5)
+			local depth_strider = mcl_enchanting.get_enchantment(boots, "depth_strider")
+			if depth_strider > 0 then
+				playerphysics.add_physics_factor(player, "speed", "mcl_playerplus:depth_strider", (depth_strider / 3) + 0.75)
+			else
+				playerphysics.remove_physics_factor(player, "speed", "mcl_playerplus:depth_strider")
+			end
+		else
+			playerphysics.remove_physics_factor(player, "speed", "mcl_playerplus:depth_strider")
 		end
 
 		-- Is player suffocating inside node? (Only for solid full opaque cube type nodes
@@ -546,22 +568,18 @@ minetest.register_globalstep(function(dtime)
 		and (node_head ~= "ignore")
 		-- Check privilege, too
 		and (not check_player_privs(name, {noclip = true})) then
-			if player:get_hp() > 0 then
-				mcl_util.deal_damage(player, 1, {type = "in_wall"})
-			end
+			mcl_util.deal_damage(player, 1, {type = "in_wall"})
 		end
 
 		-- Am I near a cactus?
-		local near = find_node_near(pos, 1, "mcl_core:cactus")
-		if not near then
-			near = find_node_near({x=pos.x, y=pos.y-1, z=pos.z}, 1, "mcl_core:cactus")
-		end
-		if near then
-			-- Am I touching the cactus? If so, it hurts
-			local dist = vector.distance(pos, near)
-			local dist_feet = vector.distance({x=pos.x, y=pos.y-1, z=pos.z}, near)
-			if dist < 1.1 or dist_feet < 1.1 then
-				if player:get_hp() > 0 then
+		if node_stand == "mcl_core:cactus" or node_feet == "mcl_core:cactus" or node_head == "mcl_core:cactus" then
+			mcl_util.deal_damage(player, 1, {type = "cactus"})
+		else
+			local near = find_node_near(pos, 1, "mcl_core:cactus")
+			if near then
+				-- Am I touching the cactus? If so, it hurts
+				local dist = vector.distance(pos, near)
+				if dist < 1.1 then
 					mcl_util.deal_damage(player, 1, {type = "cactus"})
 				end
 			end
@@ -668,7 +686,7 @@ minetest.register_on_joinplayer(function(player)
 	}
 	mcl_playerplus.elytra[player] = {active = false, rocketing = 0, speed = 0}
 
-	-- Minetest bug: get_bone_position() returns all zeros vectors.
+	-- Luanti bug: get_bone_position() returns all zeros vectors.
 	-- Workaround: call set_bone_position() one time first.
 	player:set_bone_position("Head_Control", vector.new(0, 6.75, 0))
 	player:set_bone_position("Arm_Right_Pitch_Control", vector.new(-3, 5.785, 0))
@@ -679,6 +697,8 @@ minetest.register_on_joinplayer(function(player)
 		player:respawn()
 		minetest.log("warning", name .. " joined the game with 0 hp and has been forced to respawn")
 	end
+
+	playerphysics.remove_physics_factor(player, "speed", "mcl_playerplus:surface")
 end)
 
 -- clear when player leaves

@@ -19,8 +19,6 @@ local mg_seed = minetest.get_mapgen_setting("seed")
 -- Some mapgen settings
 local superflat = mg_name == "flat" and minetest.get_mapgen_setting("mcl_superflat_classic") == "true"
 
-local generate_fallen_logs = minetest.settings:get_bool("mcl_generate_fallen_logs", false)
-
 local mod_mcl_structures = minetest.get_modpath("mcl_structures")
 local mod_mcl_core = minetest.get_modpath("mcl_core")
 local mod_mcl_mushrooms = minetest.get_modpath("mcl_mushrooms")
@@ -4027,7 +4025,7 @@ local function register_decorations()
 		rotation = "random",
 	})
 	minetest.register_decoration({
-		name = "mcl_biomes:mangrove_tree_4",
+		name = "mcl_biomes:mangrove_tree_5",
 		deco_type = "schematic",
 		place_on = {"mcl_mud:mud"},
 		sidelen = 80,
@@ -4040,6 +4038,7 @@ local function register_decorations()
 		rotation = "random",
 	})
 	minetest.register_decoration({
+		name = "mcl_biomes:mangrove_bee_nest",
 		deco_type = "schematic",
 		place_on = {"mcl_mud:mud"},
 		sidelen = 80,
@@ -4655,9 +4654,9 @@ local function register_decorations()
 		place_on = {"group:sand"},
 		sidelen = 16,
 		noise_params = {
-			offset = -0.012,
+			offset = -0.01,
 			scale = 0.024,
-			spread = {x = 100, y = 100, z = 100},
+			spread = vector.new(100, 100, 100),
 			seed = 257,
 			octaves = 3,
 			persist = 0.6
@@ -4671,6 +4670,9 @@ local function register_decorations()
 				  "MesaPlateauFM", "MesaPlateauFM_sandlevel"},
 		height = 1,
 		height_max = 3,
+		spawn_by = "air",
+		check_offset = 1,
+		num_spawn_by = 16
 	})
 
 	-- Sugar canes
@@ -4966,170 +4968,6 @@ local function register_decorations()
 
 	register_doubletall_grass(-0.0005, -0.3, {"BambooJungle", "BambooJungleM", "BambooJungleEdge"})
 	register_grass_decoration("tallgrass", -0.03, 1, {"BambooJungle", "BambooJungleM", "BambooJungleEdge"})
-
-	-----------------
-	-- Fallen logs
-	-- These fallen logs are not really good yet. They must be longer and also have one upright block.
-	-- Note the decortion API does not like wide schematics, they are likely to overhang.
-	if generate_fallen_logs then
-		minetest.register_decoration({
-			deco_type = "schematic",
-			place_on = {"group:grass_block_no_snow", "mcl_core:podzol", "mcl_core:coarse_dirt"},
-			sidelen = 80,
-			noise_params = {
-				offset = 0.00018,
-				scale = 0.00011,
-				spread = {x = 250, y = 250, z = 250},
-				seed = 2,
-				octaves = 3,
-				persist = 0.66
-			},
-			biomes = {"MegaTaiga", "MegaSpruceTaiga", "Taiga"},
-			y_min = 1,
-			y_max = mcl_vars.mg_overworld_max,
-			schematic = {
-				size = {x = 3, y = 3, z = 1},
-				data = {
-					{name = "air", prob = 0},
-					{name = "air", prob = 0},
-					{name = "air", prob = 0},
-					{name = "mcl_core:sprucetree", param2 = 12, prob = 127},
-					{name = "mcl_core:sprucetree", param2 = 12},
-					{name = "mcl_core:sprucetree", param2 = 12},
-					{name = "air", prob = 0},
-					{name = "mcl_mushrooms:mushroom_brown", prob = 160},
-					{name = "mcl_mushrooms:mushroom_red", prob = 160},
-				},
-			},
-			flags = "place_center_x",
-			rotation = "random",
-		})
-
-		minetest.register_decoration({
-			deco_type = "schematic",
-			place_on = {"group:grass_block", "mcl_core:podzol", "mcl_core:podzol_snow", "mcl_core:coarse_dirt"},
-			sidelen = 80,
-			noise_params = {
-				offset = 0.00018,
-				scale = 0.00011,
-				spread = {x = 250, y = 250, z = 250},
-				seed = 2,
-				octaves = 3,
-				persist = 0.66
-			},
-			biomes = {"ColdTaiga"},
-			y_min = 1,
-			y_max = mcl_vars.mg_overworld_max,
-			schematic = {
-				size = {x = 3, y = 3, z = 1},
-				data = {
-					{name = "air", prob = 0},
-					{name = "air", prob = 0},
-					{name = "air", prob = 0},
-					{name = "mcl_core:sprucetree", param2 = 12, prob = 127},
-					{name = "mcl_core:sprucetree", param2 = 12},
-					{name = "mcl_core:sprucetree", param2 = 12},
-					{name = "air", prob = 0},
-					{name = "air", prob = 0},
-					{name = "air", prob = 0},
-				},
-			},
-			flags = "place_center_x",
-			rotation = "random",
-		})
-
-		minetest.register_decoration({
-			deco_type = "schematic",
-			place_on = {"group:grass_block_no_snow"},
-			sidelen = 16,
-			noise_params = {
-				offset = 0.0,
-				scale = -0.00008,
-				spread = {x = 250, y = 250, z = 250},
-				seed = 2,
-				octaves = 3,
-				persist = 0.66
-			},
-			biomes = {"BirchForest", "BirchForestM", },
-			y_min = 1,
-			y_max = mcl_vars.mg_overworld_max,
-			schematic = {
-				size = {x = 3, y = 3, z = 1},
-				data = {
-					{name = "air", prob = 0},
-					{name = "air", prob = 0},
-					{name = "air", prob = 0},
-					{name = "mcl_core:birchtree", param2 = 12},
-					{name = "mcl_core:birchtree", param2 = 12},
-					{name = "mcl_core:birchtree", param2 = 12, prob = 127},
-					{name = "mcl_mushrooms:mushroom_red", prob = 100},
-					{name = "mcl_mushrooms:mushroom_brown", prob = 10},
-					{name = "air", prob = 0},
-				},
-			},
-			flags = "place_center_x",
-			rotation = "random",
-		})
-
-		minetest.register_decoration({
-			deco_type = "schematic",
-			place_on = {"group:grass_block_no_snow", "mcl_core:dirt"},
-			sidelen = 80,
-			fill_ratio = 0.005,
-			biomes = {"Jungle", "JungleM"},
-			y_min = 1,
-			y_max = mcl_vars.mg_overworld_max,
-			schematic = {
-				size = {x = 3, y = 3, z = 1},
-				data = {
-					{name = "air", prob = 0},
-					{name = "air", prob = 0},
-					{name = "air", prob = 0},
-					{name = "mcl_core:jungletree", param2 = 12},
-					{name = "mcl_core:jungletree", param2 = 12},
-					{name = "mcl_core:jungletree", param2 = 12, prob = 127},
-					{name = "air", prob = 0},
-					{name = "mcl_mushrooms:mushroom_brown", prob = 50},
-					{name = "air", prob = 0},
-				},
-			},
-			flags = "place_center_x",
-			rotation = "random",
-		})
-
-		minetest.register_decoration({
-			deco_type = "schematic",
-			place_on = {"group:grass_block_no_snow"},
-			sidelen = 16,
-			noise_params = {
-				offset = 0.00018,
-				scale = 0.00011,
-				spread = {x = 250, y = 250, z = 250},
-				seed = 2,
-				octaves = 3,
-				persist = 0.66
-			},
-			biomes = {"Forest"},
-			y_min = 1,
-			y_max = mcl_vars.mg_overworld_max,
-			schematic = {
-				size = {x = 3, y = 3, z = 1},
-				data = {
-					{name = "air", prob = 0},
-					{name = "air", prob = 0},
-					{name = "air", prob = 0},
-					{name = "mcl_core:tree", param2 = 12, prob = 127},
-					{name = "mcl_core:tree", param2 = 12},
-					{name = "mcl_core:tree", param2 = 12},
-					{name = "air", prob = 0},
-					{name = "mcl_mushrooms:mushroom_brown", prob = 96},
-					{name = "mcl_mushrooms:mushroom_red", prob = 96},
-				},
-			},
-			flags = "place_center_x",
-			rotation = "random",
-		})
-	end
 
 	-- Lily pad
 
@@ -6099,6 +5937,9 @@ if mg_name ~= "singlenode" then
 		minetest.get_decoration_id("mcl_biomes:mangrove_tree_1"),
 		minetest.get_decoration_id("mcl_biomes:mangrove_tree_2"),
 		minetest.get_decoration_id("mcl_biomes:mangrove_tree_3"),
+		minetest.get_decoration_id("mcl_biomes:mangrove_tree_4"),
+		minetest.get_decoration_id("mcl_biomes:mangrove_tree_5"),
+		minetest.get_decoration_id("mcl_biomes:mangrove_bee_nest"),
 	}
 	for _, f in pairs(deco_ids_fungus) do
 		minetest.set_gen_notify({decoration = true}, {f})
@@ -6158,29 +5999,20 @@ if mg_name ~= "singlenode" then
 
 			if not (maxp.y < mcl_vars.mg_overworld_min or minp.y > mcl_vars.mg_overworld_max) then
 				local biomemap = minetest.get_mapgen_object("biomemap")
-				--minetest.log("mangrove stuff: " .. dump(biomemap))
 				local swamp_biome_id = minetest.get_biome_id("MangroveSwamp")
 				local swamp_shore_id = minetest.get_biome_id("MangroveSwamp_shore")
 				local is_swamp = table.indexof(biomemap, swamp_biome_id) ~= -1
 				local is_swamp_shore = table.indexof(biomemap, swamp_shore_id) ~= -1
-
 				if is_swamp or is_swamp_shore then
-					--minetest.log("Mangrove swamp biomes...")
-					--minetest.log("is_swamp: " .. dump(is_swamp))
-					--minetest.log("is_swamp_shore: " .. dump(is_swamp_shore))
 					mangrove_roots_gen(gennotify, pr)
-				else
-					--minetest.log("is not mangrove swamp biomes...")
 				end
 			end
 
 			if not (maxp.y < mcl_vars.mg_end_min or minp.y > mcl_vars.mg_end_max) then
-				--minetest.log("chorus stuff")
 				chorus_gen(gennotify, pr)
 			end
 
 			if not (maxp.y < mcl_vars.mg_nether_min or minp.y > mcl_vars.mg_nether_max) then
-				--minetest.log("nether stuff")
 				crimson_warped_gen(gennotify)
 			end
 		end)

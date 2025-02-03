@@ -492,7 +492,7 @@ mcl_potions.register_effect({
 	end,
 	on_step = function(dtime, object, factor, duration)
 		if object:get_meta():get_int("night_vision") ~= 1 then
-			local flash = EF.darkness[object].flash
+			local flash = EF.darkness[object].flash or 0
 			if flash < 0.2 then EF.darkness[object].flashdir = true
 			elseif flash > 0.6 then EF.darkness[object].flashdir = false end
 			flash = EF.darkness[object].flashdir and (flash + dtime) or (flash - dtime)
@@ -1260,7 +1260,11 @@ local function potions_init_icons(player)
 		})
 		table.insert(icon_ids[name], id)
 	end
-	hb.init_hudbar(player, "absorption")
+
+	-- Absorption bar in damage disabled server is unneccessary
+	if minetest.settings:get_bool("enable_damage") == true then
+		hb.init_hudbar(player, "absorption")
+	end
 end
 
 local function potions_set_icons(player)

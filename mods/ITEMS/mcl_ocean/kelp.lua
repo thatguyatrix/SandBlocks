@@ -81,7 +81,8 @@ end
 -- Is this water?
 -- Returns the liquidtype, if indeed water.
 function kelp.is_submerged(node)
-	if mt_get_item_group(node.name, "water") ~= 0 then
+	local g = mt_get_item_group(node.name, "water")
+	if g > 0 and g <= 3  then
 		-- Expected only "source" and "flowing" from water liquids
 		return mt_registered_nodes[node.name].liquidtype
 	end
@@ -99,7 +100,7 @@ function kelp.is_downward_flowing(pos, node, pos_above, node_above, __is_above__
 	if not (result or __is_above__) then
 		-- If not, also check node above.
 		-- (this is needed due a weird quirk in the definition of "downwards flowing"
-		-- liquids in Minetest)
+		-- liquids in Luanti)
 		local pos_above = pos_above or {x=pos.x,y=pos.y+1,z=pos.z}
 		local node_above = node_above or mt_get_node(pos_above)
 		result = kelp.is_submerged(node_above)
@@ -195,7 +196,7 @@ function kelp.find_unsubmerged(pos, node, height)
 	for i=1,height do
 		walk_pos.y = y + i
 		local walk_node = mt_get_node(walk_pos)
-		if not kelp.is_submerged(walk_node) then
+		if walk_node.name ~= "ignore" and not kelp.is_submerged(walk_node) then
 			return walk_pos, walk_node, height, i
 		end
 	end
@@ -267,8 +268,7 @@ function kelp.next_height(pos, node, pos_tip, node_tip, submerged, downward_flow
 	-- Flowing liquid: Grow 1 step, but also turn the tip node into a liquid source.
 	if downward_flowing then
 		local alt_liq = mt_registered_nodes[node_tip.name].liquid_alternative_source
-		local alt_liq_accessible = mt_get_item_group(node_tip.name,"waterlogged") -- returns 0 if it isn't waterlogged.
-		if alt_liq and not alt_liq_accessible then
+		if alt_liq and mt_registered_nodes[alt_liq] then
 			mt_set_node(pos_tip, {name=alt_liq})
 		end
 	end

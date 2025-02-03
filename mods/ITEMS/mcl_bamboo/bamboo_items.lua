@@ -9,8 +9,6 @@ local SIDE_SCAFFOLDING = false
 local SIDE_SCAFFOLD_NAME = "mcl_bamboo:scaffolding_horizontal"
 -- ---------------------------------------------------------------------------
 local SCAFFOLDING_NAME = "mcl_bamboo:scaffolding"
--- Used everywhere. Often this is just the name, but it makes sense to me as BAMBOO, because that's how I think of it...
--- "BAMBOO" goes here.
 local BAMBOO = "mcl_bamboo:bamboo"
 local BAMBOO_PLANK = BAMBOO .. "_plank"
 
@@ -208,7 +206,7 @@ if minetest.get_modpath("mcl_fences") then
 		wood_groups,
 		minetest.registered_nodes["mcl_core:wood"]._mcl_hardness,
 		minetest.registered_nodes["mcl_core:wood"]._mcl_blast_resistance,
-		node_sound) -- note: about missing params.. will use defaults.
+		node_sound)
 
 	mcl_bamboo.mcl_log(dump(fence_id))
 	mcl_bamboo.mcl_log(dump(gate_id))

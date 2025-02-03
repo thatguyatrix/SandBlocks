@@ -81,7 +81,7 @@ function mcl_stonecutter.register_recipe(input, output, count)
 	end
 end
 
----Minetest currently (5.7) doesn't prevent using `:` characters in field names
+---Luanti currently (5.7) doesn't prevent using `:` characters in field names
 ---But using them prevent the buttons from beeing styled with `style[]` elements
 ---https://github.com/minetest/minetest/issues/14013
 
@@ -279,7 +279,6 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	for field_name, value in pairs(fields) do
 		if field_name ~= "scroll" then
 			local itemname = fieldname_to_itemname(field_name)
-			player:get_meta():set_string("mcl_stonecutter:selected", itemname)
 			set_selected_item(player, itemname)
 			update_stonecutter_slots(player)
 			mcl_stonecutter.show_stonecutter_form(player)

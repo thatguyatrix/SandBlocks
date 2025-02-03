@@ -288,7 +288,7 @@ minetest.register_node("mcl_core:stone_smooth", {
 	sounds = mcl_sounds.node_sound_stone_defaults(),
 	is_ground_content = false,
 	_mcl_blast_resistance = 6,
-	_mcl_hardness = 1.5,
+	_mcl_hardness = 2,
 })
 
 minetest.register_node("mcl_core:granite", {
@@ -424,7 +424,7 @@ minetest.register_node("mcl_core:grass_path", {
 		footstep = {name="default_grass_footstep", gain=0.1},
 	}),
 	_mcl_blast_resistance = 0.65,
-	_mcl_hardness = 0.6,
+	_mcl_hardness = 0.65,
 })
 
 -- TODO: Add particles
@@ -497,8 +497,8 @@ minetest.register_node("mcl_core:podzol", {
 	sounds = mcl_sounds.node_sound_dirt_defaults(),
 	on_construct = mcl_core.on_snowable_construct,
 	_mcl_snowed = "mcl_core:podzol_snow",
-	_mcl_blast_resistance = 0.8,
-	_mcl_hardness = 0.8,
+	_mcl_blast_resistance = 0.5,
+	_mcl_hardness = 0.5,
 	_mcl_silk_touch_drop = true,
 })
 mcl_core.register_snowed_node("mcl_core:podzol_snow", "mcl_core:podzol", nil, nil, false, S("Podzol with Snow"))
@@ -600,8 +600,8 @@ minetest.register_node("mcl_core:sandstonesmooth", {
 	stack_max = 64,
 	groups = {pickaxey=1, sandstone=1, normal_sandstone=1, building_block=1, material_stone=1},
 	sounds = mcl_sounds.node_sound_stone_defaults(),
-	_mcl_blast_resistance = 6,
-	_mcl_hardness = 2,
+	_mcl_blast_resistance = 0.8,
+	_mcl_hardness = 0.8,
 })
 
 minetest.register_node("mcl_core:sandstonecarved", {
@@ -687,8 +687,8 @@ minetest.register_node("mcl_core:redsandstonesmooth2", {
 	stack_max = 64,
 	groups = {pickaxey=1, sandstone=1, red_sandstone=1, building_block=1, material_stone=1},
 	sounds = mcl_sounds.node_sound_stone_defaults(),
-	_mcl_blast_resistance = 0.8,
-	_mcl_hardness = 0.8,
+	_mcl_blast_resistance = 6,
+	_mcl_hardness = 2,
 })
 
 ---
@@ -790,6 +790,18 @@ minetest.register_node("mcl_core:coalblock", {
 	description = S("Block of Coal"),
 	_doc_items_longdesc = S("Blocks of coal are useful as a compact storage of coal and very useful as a furnace fuel. A block of coal is as efficient as 10 coal."),
 	tiles = {"default_coal_block.png"},
+	is_ground_content = false,
+	stack_max = 64,
+	groups = {pickaxey=1, flammable=1, building_block=1, material_stone=1, fire_encouragement=5, fire_flammability=5},
+	sounds = mcl_sounds.node_sound_stone_defaults(),
+	_mcl_blast_resistance = 6,
+	_mcl_hardness = 5,
+})
+
+minetest.register_node("mcl_core:charcoalblock", {
+	description = S("Block of Charcoal"),
+	_doc_items_longdesc = S("Blocks of charcoal are useful as a compact storage of charcoal and very useful as a furnace fuel. A block of charcoal is as efficient as 10 charcoal."),
+	tiles = {"mcl_core_charcoal_block.png"},
 	is_ground_content = false,
 	stack_max = 64,
 	groups = {pickaxey=1, flammable=1, building_block=1, material_stone=1, fire_encouragement=5, fire_flammability=5},
@@ -1051,7 +1063,15 @@ for i=1,8 do
 			local itemstring = itemstack:get_name()
 			local itemcount = itemstack:get_count()
 			local fakestack = ItemStack(itemstring.." "..itemcount)
-			fakestack:set_name("mcl_core:snow_"..math.min(8, (i+g)))
+			if i+g < 8 then
+				fakestack:set_name("mcl_core:snow_"..(i+g))
+			else
+				-- To stack `mcl_core:snow_8', just replacing it with `mcl_core:snowblock' Issue#4483
+				if i+g == 9 then
+				   fakestack:set_count(itemcount + 1)
+				end
+				fakestack:set_name("mcl_core:snowblock")
+			end
 			itemstack = minetest.item_place(fakestack, placer, pointed_thing)
 			minetest.sound_play(mcl_sounds.node_sound_snow_defaults().place, {pos = pointed_thing.under}, true)
 			itemstack:set_name(itemstring)
@@ -1119,8 +1139,8 @@ minetest.register_node("mcl_core:snowblock", {
 	on_construct = mcl_core.on_snow_construct,
 	after_destruct = mcl_core.after_snow_destruct,
 	drop = "mcl_throwing:snowball 4",
-	_mcl_blast_resistance = 0.1,
-	_mcl_hardness = 0.1,
+	_mcl_blast_resistance = 0.2,
+	_mcl_hardness = 0.2,
 	_mcl_silk_touch_drop = true,
 })
 

@@ -6,6 +6,19 @@ local modname = minetest.get_current_modname()
 local path = minetest.get_modpath(modname)
 local S = minetest.get_translator(modname)
 mcl_mobs.fallback_node = minetest.registered_aliases["mapgen_dirt"] or "mcl_core:dirt"
+
+-- used by the libaries below.
+-- get node but use fallback for nil or unknown
+local node_ok = function(pos, fallback)
+	fallback = fallback or mcl_mobs.fallback_node
+	local node = minetest.get_node_or_nil(pos)
+	if node and minetest.registered_nodes[node.name] then
+		return node
+	end
+	return minetest.registered_nodes[fallback]
+end
+mcl_mobs.node_ok = node_ok
+
 --api and helpers
 -- effects: sounds and particles mostly
 dofile(path .. "/effects.lua")
@@ -19,9 +32,8 @@ dofile(path .. "/items.lua")
 dofile(path .. "/pathfinding.lua")
 -- combat: attack logic
 dofile(path .. "/combat.lua")
--- the enity functions themselves
+-- the entity functions themselves
 dofile(path .. "/api.lua")
-
 
 --utility functions
 dofile(path .. "/breeding.lua")
@@ -36,16 +48,6 @@ local MAX_MOB_NAME_LENGTH = 30
 local old_spawn_icons = minetest.settings:get_bool("mcl_old_spawn_icons",false)
 local extended_pet_control = minetest.settings:get_bool("mcl_extended_pet_control",true)
 local difficulty = tonumber(minetest.settings:get("mob_difficulty")) or 1.0
-
--- get node but use fallback for nil or unknown
-local node_ok = function(pos, fallback)
-	fallback = fallback or mcl_mobs.fallback_node
-	local node = minetest.get_node_or_nil(pos)
-	if node and minetest.registered_nodes[node.name] then
-		return node
-	end
-	return minetest.registered_nodes[fallback]
-end
 
 --#### REGISTER FUNCS
 
@@ -114,14 +116,8 @@ function mcl_mobs.register_mob(name, def)
 	mcl_mobs.spawning_mobs[name] = true
 	mcl_mobs.registered_mobs[name] = def
 
-	local can_despawn
-	if def.can_despawn ~= nil then
-		can_despawn = def.can_despawn
-	elseif def.spawn_class == "passive" then
-		can_despawn = false
-	else
-		can_despawn = true
-	end
+	local can_despawn = def.can_despawn
+	if def.can_despawn == nil then can_despawn = def.spawn_class ~= "passive" end
 
 	local function scale_difficulty(value, default, min, special)
 		if (not value) or (value == default) or (value == special) then
@@ -141,13 +137,14 @@ function mcl_mobs.register_mob(name, def)
 	local final_def = {
 		use_texture_alpha = def.use_texture_alpha,
 		head_swivel = def.head_swivel or nil, -- bool to activate this function
-		head_yaw_offset = def.head_yaw_offset or 0, -- for wonkey model bones
+		head_yaw_offset = math.rad(def.head_yaw_offset or 0), -- for wonkey model bones
 		head_pitch_multiplier = def.head_pitch_multiplier or 1, --for inverted pitch
-		bone_eye_height = def.bone_eye_height or 1.4, -- head bone offset
-		head_eye_height = def.head_eye_height or def.bone_eye_height or 0, -- how hight aproximatly the mobs head is fromm the ground to tell the mob how high to look up at the player
+		head_eye_height = def.head_eye_height or 1, -- how high approximately the mobs eyes are from the ground to tell the mob how high to look up at the player
+		head_max_yaw = def.head_max_yaw, -- how far the mob may turn the head
+		head_max_pitch = def.head_max_pitch, -- how far up and down the mob may pitch the head
+		head_bone_position = def.head_bone_position or { 0, def.bone_eye_height or 1.4, def.horizontal_head_height or 0},
 		curiosity = def.curiosity or 1, -- how often mob will look at player on idle
 		head_yaw = def.head_yaw or "y", -- axis to rotate head on
-		horizontal_head_height = def.horizontal_head_height or 0,
 		wears_armor = def.wears_armor, -- a number value used to index texture slot for armor
 		stepheight = def.stepheight or 0.6,
 		name = name,
@@ -528,7 +525,7 @@ end
 -- Note: This also introduces the “spawn_egg” group:
 -- * spawn_egg=1: Spawn egg (generic mob, no metadata)
 -- * spawn_egg=2: Spawn egg (captured/tamed mob, metadata)
-function mcl_mobs.register_egg(mob, desc, background_color, overlay_color, addegg, no_creative)
+function mcl_mobs.register_egg(mob_id, desc, background_color, overlay_color, addegg, no_creative)
 
 	local grp = {spawn_egg = 1}
 
@@ -539,7 +536,7 @@ function mcl_mobs.register_egg(mob, desc, background_color, overlay_color, addeg
 
 	local invimg = "(spawn_egg.png^[multiply:" .. background_color ..")^(spawn_egg_overlay.png^[multiply:" .. overlay_color .. ")"
 	if old_spawn_icons then
-		local mobname = mob:gsub("mobs_mc:","")
+		local mobname = mob_id:gsub("mobs_mc:","")
 		local fn = "mobs_mc_spawn_icon_"..mobname..".png"
 		if mcl_util.file_exists(minetest.get_modpath("mobs_mc").."/textures/"..fn) then
 			invimg = fn
@@ -551,7 +548,7 @@ function mcl_mobs.register_egg(mob, desc, background_color, overlay_color, addeg
 	end
 
 	-- register old stackable mob egg
-	minetest.register_craftitem(mob, {
+	minetest.register_craftitem(mob_id, {
 
 		description = desc,
 		inventory_image = invimg,
@@ -561,7 +558,6 @@ function mcl_mobs.register_egg(mob, desc, background_color, overlay_color, addeg
 		_doc_items_usagehelp = S("Just place it where you want the mob to appear. Animals will spawn tamed, unless you hold down the sneak key while placing. If you place this on a mob spawner, you change the mob it spawns."),
 
 		on_place = function(itemstack, placer, pointed_thing)
-
 			local pos = pointed_thing.above
 
 			-- am I clicking on something with existing on_rightclick function?
@@ -571,10 +567,11 @@ function mcl_mobs.register_egg(mob, desc, background_color, overlay_color, addeg
 				return def.on_rightclick(pointed_thing.under, under, placer, itemstack)
 			end
 
+			local mob_name = itemstack:get_name()
+
 			if pos and within_limits(pos, 0)  and not minetest.is_protected(pos, placer:get_player_name()) then
 				local name = placer:get_player_name()
 				local privs = minetest.get_player_privs(name)
-
 
 				if under.name == "mcl_mobspawners:spawner" then
 					if minetest.is_protected(pointed_thing.under, name) then
@@ -593,7 +590,6 @@ function mcl_mobs.register_egg(mob, desc, background_color, overlay_color, addeg
 					--minetest.log("max light: " .. mob_light_lvl[2])
 
 					-- Handle egg conversion
-					local mob_name = itemstack:get_name()
 					local convert_to = (minetest.registered_entities[mob_name] or {})._convert_to
 					if convert_to then mob_name = convert_to end
 
@@ -604,19 +600,24 @@ function mcl_mobs.register_egg(mob, desc, background_color, overlay_color, addeg
 					return itemstack
 				end
 
-				if not minetest.registered_entities[mob] then
+				if not minetest.registered_entities[mob_name] then
 					return itemstack
 				end
 
 				if minetest.settings:get_bool("only_peaceful_mobs", false)
-						and minetest.registered_entities[mob].type == "monster" then
+						and minetest.registered_entities[mob_name].type == "monster" then
 					minetest.chat_send_player(name, S("Only peaceful mobs allowed!"))
 					return itemstack
 				end
 
-				pos.y = pos.y - 0.5
+				pos.y = pos.y - 1
+				local mob = mcl_mobs.spawn(pos, mob_name)
+				if not mob then
+					pos.y = pos.y + 1
+					mob = mcl_mobs.spawn(pos, mob_name)
+					if not mob then return end
+				end
 
-				local mob = minetest.add_entity(pos, mob)
 				local entityname = itemstack:get_name()
 				minetest.log("action", "Player " ..name.." spawned "..entityname.." at "..minetest.pos_to_string(pos))
 				local ent = mob:get_luaentity()
@@ -647,5 +648,4 @@ function mcl_mobs.register_egg(mob, desc, background_color, overlay_color, addeg
 			return itemstack
 		end,
 	})
-
 end
